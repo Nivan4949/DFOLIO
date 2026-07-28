@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const roomController_1 = require("../controllers/roomController");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.post('/', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER']), roomController_1.createRoom);
+router.get('/', auth_1.authenticateJWT, roomController_1.getRooms);
+router.get('/:id', auth_1.authenticateJWT, roomController_1.getRoomById);
+router.put('/:id', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER']), roomController_1.updateRoom);
+router.delete('/:id', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER']), roomController_1.deleteRoom);
+exports.default = router;

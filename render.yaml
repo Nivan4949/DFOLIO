@@ -1,0 +1,37 @@
+services:
+  # Express Backend API Service
+  - type: web
+    name: dfolio-backend
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dfolio-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: dfolio-site-photos
+
+# Managed PostgreSQL Database
+databases:
+  - name: dfolio-db
+    databaseName: dfolio
+    user: dfolio_user
+    plan: free

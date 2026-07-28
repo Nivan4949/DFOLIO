@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const snagController_1 = require("../controllers/snagController");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.post('/', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER', 'CONTRACTOR']), snagController_1.createSnag);
+router.get('/', auth_1.authenticateJWT, snagController_1.getSnags);
+router.get('/:id', auth_1.authenticateJWT, snagController_1.getSnagById);
+router.put('/:id', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER', 'CONTRACTOR']), snagController_1.updateSnag);
+router.delete('/:id', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER']), snagController_1.deleteSnag);
+exports.default = router;

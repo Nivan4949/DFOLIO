@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const subWorkController_1 = require("../controllers/subWorkController");
+const auth_1 = require("../middleware/auth");
+const router = (0, express_1.Router)();
+router.post('/', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER']), subWorkController_1.createSubWork);
+router.get('/', auth_1.authenticateJWT, subWorkController_1.getSubWorks);
+router.get('/:id', auth_1.authenticateJWT, subWorkController_1.getSubWorkById);
+router.put('/:id', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER']), subWorkController_1.updateSubWork);
+router.delete('/:id', auth_1.authenticateJWT, (0, auth_1.authorizeRoles)(['ADMIN', 'PROJECT_MANAGER']), subWorkController_1.deleteSubWork);
+exports.default = router;
