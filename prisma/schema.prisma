@@ -25,6 +25,7 @@ model User {
   createdSnags    Snag[]    @relation("CreatedSnags")
   photos          Photo[]
   notes           Note[]
+  activityLogs    ActivityLog[]
 }
 
 model Project {
@@ -206,3 +207,20 @@ model Note {
   @@index([taskId])
   @@index([snagId])
 }
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  projectId   String?
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String   // e.g. "TASK_PROGRESS_UPDATED", "SNAG_CREATED", "USER_REGISTERED"
+  entityType  String   // e.g. "TASK", "SNAG", "PROJECT", "USER"
+  entityId    String?
+  details     String?  // Summary message or metadata
+  createdAt   DateTime @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([createdAt])
+}
+

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
+import Login from './pages/Login';
 import { Loader2 } from 'lucide-react';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -12,17 +14,18 @@ const Tasks = lazy(() => import('./pages/Tasks'));
 const Timeline = lazy(() => import('./pages/Timeline'));
 const Snags = lazy(() => import('./pages/Snags'));
 const Reports = lazy(() => import('./pages/Reports'));
+const Users = lazy(() => import('./pages/Users'));
 const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 const ContractorPortal = lazy(() => import('./pages/ContractorPortal'));
 const Settings = lazy(() => import('./pages/Settings'));
 
-const App: React.FC = () => {
+const MainContent: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [theme, setTheme] = useState<'dark' | 'midnight'>('midnight');
   const [simulatedRole, setSimulatedRole] = useState<string>('PROJECT_MANAGER');
 
-  // Add theme class to root body element
   useEffect(() => {
     const body = document.body;
     if (theme === 'midnight') {
@@ -31,6 +34,21 @@ const App: React.FC = () => {
       body.className = 'bg-[#030712] text-[#f3f4f6]';
     }
   }, [theme]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#060814]">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-brand-500 animate-spin mx-auto mb-4" />
+          <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest">Initializing DFOLIO Session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
 
   const renderContent = () => {
     switch (currentTab) {
@@ -52,6 +70,8 @@ const App: React.FC = () => {
         return <Snags />;
       case 'reports':
         return <Reports />;
+      case 'users':
+        return <Users />;
       case 'client':
         return <ClientPortal />;
       case 'contractor':
@@ -112,6 +132,14 @@ const App: React.FC = () => {
         </main>
       </div>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <MainContent />
+    </AuthProvider>
   );
 };
 

@@ -29,8 +29,10 @@ import {
   Italic,
   List,
   ExternalLink,
-  User as UserIcon
+  User as UserIcon,
+  Download
 } from 'lucide-react';
+import { exportToCSV } from '../utils/exportUtils';
 
 interface RoomOption {
   id: string;
@@ -473,6 +475,23 @@ const Tasks: React.FC = () => {
   const contractorOptions = users.filter(u => u.role === 'CONTRACTOR' || u.role === 'ADMIN' || u.role === 'PROJECT_MANAGER');
   const supervisorOptions = users.filter(u => u.role === 'SITE_ENGINEER' || u.role === 'ADMIN' || u.role === 'PROJECT_MANAGER');
 
+  const handleExportCSV = () => {
+    const formatted = tasks.map((t) => ({
+      Task_ID: t.id,
+      Task_Title: t.title || t.name,
+      Status: t.status,
+      Priority: t.priority,
+      Progress_Percent: t.progress,
+      Start_Date: t.startDate ? t.startDate.split('T')[0] : '',
+      End_Date: t.endDate ? t.endDate.split('T')[0] : '',
+      Contractor: t.contractor?.name || 'Unassigned',
+      Supervisor: t.supervisor?.name || 'Unassigned',
+      Room: t.room?.name || 'Unassigned',
+      Labour_Count: t.labourCount || 1,
+    }));
+    exportToCSV(formatted, 'DFOLIO_Task_Execution_Schedule');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* HEADER WITH CONTROLS */}
@@ -487,13 +506,24 @@ const Tasks: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAddModal}
-          className="flex items-center justify-center gap-2 py-2 px-4 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(14,160,234,0.2)]"
-        >
-          <Plus className="w-4 h-4" />
-          Create Task
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center justify-center gap-1.5 py-2 px-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold rounded-xl text-xs transition-all"
+            title="Export Task Schedule to CSV File"
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            Export CSV
+          </button>
+
+          <button
+            onClick={handleOpenAddModal}
+            className="flex items-center justify-center gap-2 py-2 px-4 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(14,160,234,0.2)]"
+          >
+            <Plus className="w-4 h-4" />
+            Create Task
+          </button>
+        </div>
       </div>
 
       {/* FILTER BAR FOR ALL 5 STATUSES */}

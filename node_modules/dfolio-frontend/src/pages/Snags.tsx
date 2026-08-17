@@ -12,8 +12,10 @@ import {
   HardHat,
   Camera,
   FileText,
-  Calendar
+  Calendar,
+  Download
 } from 'lucide-react';
+import { exportToCSV } from '../utils/exportUtils';
 
 interface RoomOption {
   id: string;
@@ -297,6 +299,22 @@ const Snags: React.FC = () => {
     return true;
   });
 
+  const handleExportCSV = () => {
+    const formatted = snags.map((s) => ({
+      Snag_ID: s.id,
+      Title: s.title,
+      Status: s.status,
+      Priority: s.priority,
+      DueDate: s.dueDate ? s.dueDate.split('T')[0] : '',
+      AssignedLabour: s.assignedTo?.name || 'Unassigned',
+      Room: s.room?.name || 'Unassigned',
+      Floor: s.room?.floor?.name || 'Unassigned',
+      Task: s.task?.name || 'Unassigned',
+      Description: s.description || '',
+    }));
+    exportToCSV(formatted, 'DFOLIO_Defect_Snag_List');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* HEADER WITH CONTROLS */}
@@ -311,13 +329,24 @@ const Snags: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAddModal}
-          className="flex items-center justify-center gap-2 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(239,68,68,0.25)]"
-        >
-          <Plus className="w-4 h-4" />
-          Create Snag
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center justify-center gap-1.5 py-2 px-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold rounded-xl text-xs transition-all"
+            title="Export Defect Snag List to CSV File"
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            Export CSV
+          </button>
+
+          <button
+            onClick={handleOpenAddModal}
+            className="flex items-center justify-center gap-2 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(239,68,68,0.25)]"
+          >
+            <Plus className="w-4 h-4" />
+            Create Snag
+          </button>
+        </div>
       </div>
 
       {/* FILTER BAR */}

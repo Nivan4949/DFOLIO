@@ -11,9 +11,13 @@
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate dev",
+    "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:studio": "npx prisma studio",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json,css,md}\""
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.21.0",

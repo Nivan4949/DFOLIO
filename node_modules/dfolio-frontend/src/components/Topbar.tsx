@@ -108,6 +108,7 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
       case 'timeline': return 'Execution Timeline';
       case 'snags': return 'Defect & Snag Tracker';
       case 'reports': return 'Executive Reports';
+      case 'users': return 'User & Access Management';
       case 'settings': return 'System Settings';
       default: return 'Construction Portal';
     }

@@ -14,6 +14,9 @@ import noteRoutes from './routes/noteRoutes';
 import snagRoutes from './routes/snagRoutes';
 import reportRoutes from './routes/reportRoutes';
 import searchRoutes from './routes/searchRoutes';
+import userRoutes from './routes/userRoutes';
+import activityRoutes from './routes/activityRoutes';
+import prisma from './config/prisma';
 
 const app = express();
 
@@ -50,13 +53,24 @@ app.use(cors({
 
 app.use(express.json({ limit: '20mb' }));
 
-// Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString() 
-  });
+// Enhanced Health Check with Database Connectivity Test
+app.get('/api/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ 
+      status: 'healthy', 
+      database: 'connected',
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString() 
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'unhealthy',
+      database: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Mounted Routes
@@ -72,6 +86,8 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/snags', snagRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/activity', activityRoutes);
 
 // Generic 404 handler
 app.use((req, res) => {

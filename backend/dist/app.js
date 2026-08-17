@@ -19,6 +19,9 @@ const noteRoutes_1 = __importDefault(require("./routes/noteRoutes"));
 const snagRoutes_1 = __importDefault(require("./routes/snagRoutes"));
 const reportRoutes_1 = __importDefault(require("./routes/reportRoutes"));
 const searchRoutes_1 = __importDefault(require("./routes/searchRoutes"));
+const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
+const activityRoutes_1 = __importDefault(require("./routes/activityRoutes"));
+const prisma_1 = __importDefault(require("./config/prisma"));
 const app = (0, express_1.default)();
 // Security Headers
 app.use((0, helmet_1.default)());
@@ -48,13 +51,25 @@ app.use((0, cors_1.default)({
     credentials: true,
 }));
 app.use(express_1.default.json({ limit: '20mb' }));
-// Health Check
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'healthy',
-        environment: process.env.NODE_ENV || 'development',
-        timestamp: new Date().toISOString()
-    });
+// Enhanced Health Check with Database Connectivity Test
+app.get('/api/health', async (req, res) => {
+    try {
+        await prisma_1.default.$queryRaw `SELECT 1`;
+        res.json({
+            status: 'healthy',
+            database: 'connected',
+            environment: process.env.NODE_ENV || 'development',
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        res.status(503).json({
+            status: 'unhealthy',
+            database: 'disconnected',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 // Mounted Routes
 app.use('/api/auth', authRoutes_1.default);
@@ -69,6 +84,8 @@ app.use('/api/notes', noteRoutes_1.default);
 app.use('/api/snags', snagRoutes_1.default);
 app.use('/api/reports', reportRoutes_1.default);
 app.use('/api/search', searchRoutes_1.default);
+app.use('/api/users', userRoutes_1.default);
+app.use('/api/activity', activityRoutes_1.default);
 // Generic 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'Endpoint not found' });
