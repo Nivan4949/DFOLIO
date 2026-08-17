@@ -8,9 +8,9 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "build": "prisma generate --schema=prisma/schema.prisma && npm run build --prefix backend && npm run build --prefix frontend",
-    "postinstall": "prisma generate --schema=prisma/schema.prisma",
-    "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
+    "build": "node node_modules/prisma/build/index.js generate --schema=prisma/schema.prisma && npm run build --prefix backend && npm run build --prefix frontend",
+    "postinstall": "node node_modules/prisma/build/index.js generate --schema=prisma/schema.prisma",
+    "prisma:generate": "node node_modules/prisma/build/index.js generate --schema=prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:studio": "prisma studio --schema=prisma/schema.prisma",
