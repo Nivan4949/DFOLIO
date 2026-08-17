@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
-    "build": "node ../node_modules/prisma/build/index.js generate --schema=../prisma/schema.prisma && tsc",
+    "build": "node ../node_modules/prisma/build/index.js generate --schema=../prisma/schema.prisma && node ../node_modules/typescript/lib/tsc.js",
     "start": "node dist/index.js"
   },
   "dependencies": {
