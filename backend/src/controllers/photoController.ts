@@ -145,7 +145,6 @@ export const getAllPhotos = async (req: AuthenticatedRequest, res: Response) => 
         task: {
           select: {
             name: true,
-            title: true,
             room: { select: { name: true, floor: { select: { name: true } } } },
           },
         },

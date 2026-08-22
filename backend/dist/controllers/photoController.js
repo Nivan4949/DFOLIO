@@ -140,7 +140,6 @@ const getAllPhotos = async (req, res) => {
                 task: {
                     select: {
                         name: true,
-                        title: true,
                         room: { select: { name: true, floor: { select: { name: true } } } },
                     },
                 },
