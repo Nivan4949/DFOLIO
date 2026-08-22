@@ -6,16 +6,27 @@ import {
   AlertTriangle, 
   Clock, 
   TrendingUp, 
-  AlertCircle,
-  CheckCircle2,
+  ArrowUpRight,
   Camera,
-  FolderKanban,
-  PlayCircle,
-  PauseCircle,
-  ShieldCheck,
   Calendar,
-  Loader2
+  Layers,
+  MapPin
 } from 'lucide-react';
+
+interface ProjectItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  location?: string | null;
+  startDate: string;
+  endDate?: string | null;
+  status: string;
+  _count?: {
+    tasks: number;
+    snags: number;
+    floors: number;
+  };
+}
 
 interface TaskItem {
   id: string;
@@ -61,45 +72,93 @@ interface DashboardStatsData {
   recentPhotos: PhotoItem[];
 }
 
+// High Quality Architectural Photographic Thumbnails for Projects
+const ARCH_PROJECT_PHOTOS = [
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1200&q=80',
+];
+
+// Helper Animated Counter Component
+const AnimatedNumber: React.FC<{ value: number; duration?: number; suffix?: string }> = ({ value, duration = 1000, suffix = '' }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = value;
+    if (start === end) {
+      setDisplayValue(end);
+      return;
+    }
+    const incrementTime = (duration / (end || 1));
+    const timer = setInterval(() => {
+      start += 1;
+      setDisplayValue(start);
+      if (start >= end) {
+        setDisplayValue(end);
+        clearInterval(timer);
+      }
+    }, Math.max(16, incrementTime));
+
+    return () => clearInterval(timer);
+  }, [value, duration]);
+
+  return <span>{displayValue}{suffix}</span>;
+};
+
 const Dashboard: React.FC = () => {
-  const [data, setData] = useState<DashboardStatsData | null>(null);
+  const [stats, setStats] = useState<DashboardStatsData | null>(null);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError('');
-      const res = await client.get('/api/projects/dashboard/stats');
-      setData(res.data);
+      const [statsRes, projectsRes] = await Promise.all([
+        client.get('/api/projects/dashboard/stats'),
+        client.get('/api/projects')
+      ]);
+      setStats(statsRes.data);
+      setProjects(projectsRes.data);
     } catch (err: any) {
       console.error('Failed to load dashboard metrics:', err);
-      setError(err.response?.data?.error || 'Failed to load live dashboard statistics.');
+      setError(err.response?.data?.error || 'Failed to load live dashboard metrics.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDashboardStats();
+    fetchDashboardData();
   }, []);
 
   if (loading) {
     return (
-      <div className="glass-card p-16 text-center rounded-2xl animate-fade-in">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto mb-3" />
-        <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Loading Live Construction Metrics...</p>
+      <div className="space-y-8 animate-fade-in">
+        <div className="space-y-2">
+          <div className="h-4 w-32 arch-skeleton" />
+          <div className="h-10 w-96 arch-skeleton" />
+          <div className="h-4 w-64 arch-skeleton" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-32 arch-skeleton" />
+          ))}
+        </div>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (error || !stats) {
     return (
-      <div className="p-6 bg-red-950/40 border border-red-500/30 text-red-200 text-sm rounded-2xl flex items-center gap-3">
-        <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0" />
+      <div className="p-6 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-200 text-xs rounded-sm flex items-center gap-3">
+        <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
         <div>
-          <p className="font-bold">Dashboard Synchronization Error</p>
-          <p className="text-xs text-red-300 mt-0.5">{error || 'Could not fetch live dashboard metrics'}</p>
+          <p className="font-semibold">Dashboard Synchronization Issue</p>
+          <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">{error || 'Could not connect to live metrics.'}</p>
         </div>
       </div>
     );
@@ -111,294 +170,314 @@ const Dashboard: React.FC = () => {
     todayTasks,
     pendingSnagsCount,
     delayedTasksCount,
-    statusBreakdown,
     categoryBreakdown,
     recentPhotos
-  } = data;
+  } = stats;
 
-  const totalTasks = (statusBreakdown.NOT_STARTED || 0) +
-                     (statusBreakdown.IN_PROGRESS || 0) +
-                     (statusBreakdown.HOLD || 0) +
-                     (statusBreakdown.INSPECTION || 0) +
-                     (statusBreakdown.COMPLETED || 0);
+  const formattedDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-12 animate-fade-in">
       
-      {/* 🚀 TOP 4 REQUIRED CARDS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 🏛️ EDITORIAL HERO SECTION */}
+      <section className="space-y-3 pb-6 border-b border-[#E8E5DF] dark:border-[#2B2D34]">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#6E7179] dark:text-[#A0A4AD]">
+          {formattedDate} &nbsp;—&nbsp; EXECUTIVE CONTROL
+        </div>
         
-        {/* CARD 1: OVERALL PROGRESS */}
-        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-            <span>Overall Progress</span>
-            <TrendingUp className="w-4 h-4 text-brand-400" />
-          </div>
-          <div className="text-3xl font-extrabold text-white mt-2 tracking-tight flex items-baseline gap-1">
-            <span>{overallProgress}%</span>
-            <span className="text-xs text-slate-400 font-normal">avg completion</span>
-          </div>
+        <h1 className="font-serif text-3xl md:text-5xl font-normal text-[#16171A] dark:text-[#F4F2ED] tracking-tight leading-tight">
+          Good morning. <br className="hidden sm:inline" />
+          <span className="italic font-light">Your projects, under control.</span>
+        </h1>
 
-          <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden mt-3 border border-white/5">
-            <div
-              className="h-full bg-gradient-to-r from-brand-500 to-cyan-400 rounded-full transition-all duration-500"
-              style={{ width: `${Math.max(4, overallProgress)}%` }}
+        <p className="text-xs md:text-sm text-[#6E7179] dark:text-[#A0A4AD] max-w-2xl leading-relaxed pt-1">
+          Real-time architectural project execution, quality assurance snags, and daily site operations across active developments.
+        </p>
+      </section>
+
+      {/* 📊 EDITORIAL METRICS COUNTERS (MINIMAL ARCHITECTURAL CARDS) */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        <div className="arch-card p-6 space-y-2">
+          <div className="text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider flex justify-between items-center">
+            <span>Overall Completion</span>
+            <TrendingUp className="w-4 h-4 text-[#16171A] dark:text-[#F4F2ED]" />
+          </div>
+          <div className="font-serif text-3xl md:text-4xl font-semibold text-[#16171A] dark:text-[#F4F2ED] tracking-tight">
+            <AnimatedNumber value={overallProgress} suffix="%" />
+          </div>
+          <div className="w-full h-1 bg-[#FAF8F5] dark:bg-[#121316] border border-[#E8E5DF] dark:border-[#2B2D34] overflow-hidden mt-2">
+            <div 
+              className="h-full bg-[#16171A] dark:bg-[#F4F2ED] transition-all duration-1000"
+              style={{ width: `${Math.max(3, overallProgress)}%` }}
             />
           </div>
-
-          <div className="text-[10px] text-brand-400 font-bold flex items-center gap-1 mt-2">
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Across all rooms & categories</span>
+          <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD] pt-1">
+            Site-wide execution average
           </div>
         </div>
 
-        {/* CARD 2: TODAY'S TASKS */}
-        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-            <span>Today's Tasks</span>
-            <Calendar className="w-4 h-4 text-cyan-400" />
+        <div className="arch-card p-6 space-y-2">
+          <div className="text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider flex justify-between items-center">
+            <span>Today's Works</span>
+            <Clock className="w-4 h-4 text-[#16171A] dark:text-[#F4F2ED]" />
           </div>
-          <div className="text-3xl font-extrabold text-cyan-400 mt-2 tracking-tight">{todayTasksCount}</div>
-          <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-3">
-            <Clock className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Active work scheduled today</span>
+          <div className="font-serif text-3xl md:text-4xl font-semibold text-[#16171A] dark:text-[#F4F2ED] tracking-tight">
+            <AnimatedNumber value={todayTasksCount} />
           </div>
-          <div className="absolute right-4 bottom-4 text-cyan-400/10 group-hover:text-cyan-400/20 transition-colors">
-            <CheckSquare className="w-12 h-12" />
+          <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD] pt-3">
+            Tasks scheduled on site today
           </div>
         </div>
 
-        {/* CARD 3: PENDING SNAGS */}
-        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+        <div className="arch-card p-6 space-y-2">
+          <div className="text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider flex justify-between items-center">
             <span>Pending Snags</span>
-            <AlertTriangle className="w-4 h-4 text-red-400" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
           </div>
-          <div className="text-3xl font-extrabold text-red-400 mt-2 tracking-tight">{pendingSnagsCount}</div>
-          <div className="text-[10px] text-red-400/90 font-bold flex items-center gap-1 mt-3">
-            <AlertCircle className="w-3.5 h-3.5 animate-pulse" />
-            <span>Open & In-Progress defects</span>
+          <div className="font-serif text-3xl md:text-4xl font-semibold text-[#16171A] dark:text-[#F4F2ED] tracking-tight">
+            <AnimatedNumber value={pendingSnagsCount} />
           </div>
-          <div className="absolute right-4 bottom-4 text-red-500/10 group-hover:text-red-500/20 transition-colors">
-            <AlertTriangle className="w-12 h-12" />
+          <div className="text-[10px] text-rose-600 dark:text-rose-400 pt-3 font-medium">
+            Defects requiring clearance
           </div>
         </div>
 
-        {/* CARD 4: DELAYED TASKS */}
-        <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-            <span>Delayed Tasks</span>
-            <PauseCircle className="w-4 h-4 text-amber-400" />
+        <div className="arch-card p-6 space-y-2">
+          <div className="text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider flex justify-between items-center">
+            <span>Delayed Works</span>
+            <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-3xl font-extrabold text-amber-400 mt-2 tracking-tight">{delayedTasksCount}</div>
-          <div className="text-[10px] text-amber-400/90 font-bold flex items-center gap-1 mt-3">
-            <Clock className="w-3.5 h-3.5" />
-            <span>Overdue or on hold</span>
+          <div className="font-serif text-3xl md:text-4xl font-semibold text-[#16171A] dark:text-[#F4F2ED] tracking-tight">
+            <AnimatedNumber value={delayedTasksCount} />
           </div>
-          <div className="absolute right-4 bottom-4 text-amber-500/10 group-hover:text-amber-500/20 transition-colors">
-            <PauseCircle className="w-12 h-12" />
+          <div className="text-[10px] text-amber-600 dark:text-amber-400 pt-3 font-medium">
+            Works requiring schedule review
           </div>
         </div>
 
-      </div>
+      </section>
 
-      {/* 📊 MAIN LAYOUT: CHARTS & TODAY'S TASKS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* LEFT 2 COLUMNS: CHARTS & CATEGORY BREAKDOWN */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* CHART 1: STATUS DISTRIBUTION CHART */}
-          <div className="glass-panel p-6 rounded-2xl space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <CheckSquare className="w-5 h-5 text-brand-400" />
-                  Task Progress & Status Distribution
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Real-time status metrics across {totalTasks} execution tasks</p>
-              </div>
-            </div>
-
-            {/* Visual Bar Distribution Chart */}
-            <div className="space-y-3 pt-2">
-              <div className="w-full h-4 bg-slate-950 rounded-full overflow-hidden flex border border-white/5 p-0.5">
-                {totalTasks > 0 ? (
-                  <>
-                    <div style={{ width: `${(statusBreakdown.NOT_STARTED / totalTasks) * 100}%` }} className="bg-slate-700 h-full transition-all" title="Not Started" />
-                    <div style={{ width: `${(statusBreakdown.IN_PROGRESS / totalTasks) * 100}%` }} className="bg-brand-500 h-full transition-all" title="In Progress" />
-                    <div style={{ width: `${(statusBreakdown.HOLD / totalTasks) * 100}%` }} className="bg-amber-500 h-full transition-all" title="Hold" />
-                    <div style={{ width: `${(statusBreakdown.INSPECTION / totalTasks) * 100}%` }} className="bg-purple-500 h-full transition-all" title="Inspection" />
-                    <div style={{ width: `${(statusBreakdown.COMPLETED / totalTasks) * 100}%` }} className="bg-emerald-500 h-full transition-all" title="Completed" />
-                  </>
-                ) : (
-                  <div className="w-full bg-slate-800 h-full" />
-                )}
-              </div>
-
-              {/* Status Metric Pills */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-slate-400" /> Not Started
-                  </span>
-                  <div className="text-lg font-black text-slate-300">{statusBreakdown.NOT_STARTED}</div>
-                </div>
-
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-brand-400 uppercase flex items-center gap-1">
-                    <PlayCircle className="w-3 h-3 text-brand-400" /> In Progress
-                  </span>
-                  <div className="text-lg font-black text-brand-300">{statusBreakdown.IN_PROGRESS}</div>
-                </div>
-
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-amber-400 uppercase flex items-center gap-1">
-                    <PauseCircle className="w-3 h-3 text-amber-400" /> Hold
-                  </span>
-                  <div className="text-lg font-black text-amber-300">{statusBreakdown.HOLD}</div>
-                </div>
-
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-purple-400 uppercase flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-purple-400" /> Inspection
-                  </span>
-                  <div className="text-lg font-black text-purple-300">{statusBreakdown.INSPECTION}</div>
-                </div>
-
-                <div className="p-3 bg-slate-900/60 rounded-xl border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                  </span>
-                  <div className="text-lg font-black text-emerald-300">{statusBreakdown.COMPLETED}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CHART 2: TRADE / WORK CATEGORIES BREAKDOWN */}
-          <div className="glass-panel p-6 rounded-2xl space-y-4">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <FolderKanban className="w-5 h-5 text-cyan-400" />
-              Work Categories Progress Breakdown
-            </h3>
-
-            <div className="space-y-3">
-              {categoryBreakdown.length === 0 ? (
-                <p className="text-xs text-slate-500 italic">No work categories configured.</p>
-              ) : (
-                categoryBreakdown.map((cat) => (
-                  <div key={cat.id} className="glass-card p-4 rounded-xl space-y-2">
-                    <div className="flex justify-between items-center text-xs font-bold">
-                      <span className="text-white flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                        {cat.name}
-                        <span className="text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
-                          {cat.taskCount} tasks
-                        </span>
-                      </span>
-                      <span className="text-cyan-300 font-extrabold">{cat.progress}%</span>
-                    </div>
-
-                    <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-white/5">
-                      <div
-                        className="h-full bg-gradient-to-r from-brand-500 to-cyan-400 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(4, cat.progress)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
-
-        {/* RIGHT 1 COLUMN: TODAY'S TASKS SCHEDULE */}
-        <div className="space-y-6">
-          <div className="glass-panel p-6 rounded-2xl space-y-4">
-            <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-cyan-400" />
-                Today's Task Schedule
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Tasks scheduled for active execution today</p>
-            </div>
-
-            <div className="space-y-3">
-              {todayTasks.length === 0 ? (
-                <div className="p-6 text-center border border-dashed border-slate-800 rounded-xl">
-                  <CheckCircle2 className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-slate-400">No Tasks Scheduled For Today</p>
-                </div>
-              ) : (
-                todayTasks.map((t) => (
-                  <div key={t.id} className="glass-card p-4 rounded-xl space-y-2 border-l-2 border-cyan-400">
-                    <div className="flex justify-between items-start">
-                      <h4 className="text-xs font-extrabold text-white leading-tight">
-                        {t.title || t.name}
-                      </h4>
-                      <span className="text-[10px] font-black text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                        {t.progress}%
-                      </span>
-                    </div>
-
-                    <div className="text-[10px] text-slate-400 space-y-1">
-                      {t.subWork?.name && (
-                        <div>Trade: <strong className="text-slate-200">{t.subWork.name}</strong></div>
-                      )}
-                      {t.room?.name && (
-                        <div>Room: <strong className="text-slate-200">{t.room.name}</strong></div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* 📷 RECENT PHOTOS GALLERY (SUPABASE STORAGE) */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div className="flex justify-between items-center">
+      {/* 🏢 ACTIVE PROJECTS OVERVIEW (LARGE EDITORIAL PHOTOGRAPHIC CARDS) */}
+      <section className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-4">
           <div>
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Camera className="w-5 h-5 text-brand-400" />
-              Recent Site Execution Photos
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Latest site inspection photos stored in Supabase Storage</p>
+            <div className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#6E7179] dark:text-[#A0A4AD]">
+              PORTFOLIO CONTROL
+            </div>
+            <h2 className="font-serif text-2xl font-bold text-[#16171A] dark:text-[#F4F2ED] tracking-tight mt-1 flex items-center gap-3">
+              ACTIVE PROJECTS 
+              <span className="font-mono text-sm font-normal text-[#6E7179] dark:text-[#A0A4AD] bg-[#EFECE6] dark:bg-[#22242B] px-2 py-0.5">
+                {String(projects.length).padStart(2, '0')}
+              </span>
+            </h2>
           </div>
+          <span className="text-xs text-[#6E7179] dark:text-[#A0A4AD]">
+            Hover cards to inspect live development details
+          </span>
+        </div>
+
+        {projects.length === 0 ? (
+          <div className="arch-card p-12 text-center">
+            <Building2 className="w-10 h-10 text-[#8C8F99] mx-auto mb-3" />
+            <h3 className="font-serif text-lg font-bold text-[#16171A] dark:text-[#F4F2ED]">No Active Projects</h3>
+            <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1 max-w-sm mx-auto">
+              Your first project will appear here once initialized in the portfolio system.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {projects.map((proj, idx) => {
+              const photoUrl = ARCH_PROJECT_PHOTOS[idx % ARCH_PROJECT_PHOTOS.length];
+              return (
+                <div 
+                  key={proj.id} 
+                  className="arch-card arch-image-card group h-[360px] cursor-pointer"
+                >
+                  <img 
+                    src={photoUrl} 
+                    alt={proj.name} 
+                    loading="lazy" 
+                  />
+
+                  {/* Top Status Tag Pill */}
+                  <div className="absolute top-4 left-4 z-10">
+                    <span className="text-[9px] font-mono uppercase tracking-widest bg-[#16171A]/90 text-[#FAF8F5] px-2.5 py-1 backdrop-blur-md">
+                      {proj.status}
+                    </span>
+                  </div>
+
+                  {/* Arrow Indicator Top Right */}
+                  <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-all duration-300 transform -translate-y-1 group-hover:translate-y-0">
+                    <div className="w-8 h-8 bg-white/90 dark:bg-black/90 text-[#16171A] dark:text-[#F4F2ED] flex items-center justify-center backdrop-blur-md">
+                      <ArrowUpRight className="w-4 h-4" />
+                    </div>
+                  </div>
+
+                  {/* Bottom Editorial Content Overlay */}
+                  <div className="arch-image-overlay">
+                    <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 space-y-2">
+                      {proj.location && (
+                        <div className="text-[10px] font-semibold text-white/70 uppercase tracking-widest flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {proj.location}
+                        </div>
+                      )}
+                      
+                      <h3 className="font-serif text-2xl font-bold text-white tracking-tight leading-snug">
+                        {proj.name}
+                      </h3>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-white/20 text-xs text-white/90">
+                        <span className="flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-white/70" />
+                          {proj._count?.floors || 0} Floors &nbsp;•&nbsp; {proj._count?.tasks || 0} Works
+                        </span>
+                        
+                        <div className="font-mono text-xs font-semibold text-white">
+                          Target: {proj.endDate ? new Date(proj.endDate).toLocaleDateString() : 'TBD'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* 📐 PROJECT PROGRESS & TRADE BREAKDOWN */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
+        
+        {/* Trade / Categories Breakdown */}
+        <div className="lg:col-span-2 arch-card p-6 space-y-6">
+          <div className="flex justify-between items-center border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-4">
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#6E7179] dark:text-[#A0A4AD]">
+                ANALYSIS
+              </div>
+              <h3 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED]">
+                Trade Execution Breakdown
+              </h3>
+            </div>
+            <span className="text-xs font-mono text-[#6E7179] dark:text-[#A0A4AD]">
+              {categoryBreakdown.length} Categories
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {categoryBreakdown.length === 0 ? (
+              <p className="text-xs text-[#8C8F99] italic">No category breakdown data available.</p>
+            ) : (
+              categoryBreakdown.map((cat) => (
+                <div key={cat.id} className="space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-medium">
+                    <span className="text-[#16171A] dark:text-[#F4F2ED] font-semibold">
+                      {cat.name}
+                      <span className="text-[10px] font-mono text-[#6E7179] dark:text-[#A0A4AD] ml-2">
+                        ({cat.taskCount} tasks)
+                      </span>
+                    </span>
+                    <span className="font-mono font-bold text-[#16171A] dark:text-[#F4F2ED]">
+                      {cat.progress}%
+                    </span>
+                  </div>
+                  
+                  <div className="w-full h-1.5 bg-[#FAF8F5] dark:bg-[#121316] border border-[#E8E5DF] dark:border-[#2B2D34] overflow-hidden">
+                    <div 
+                      className="h-full bg-[#16171A] dark:bg-[#F4F2ED] transition-all duration-700"
+                      style={{ width: `${Math.max(2, cat.progress)}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Scheduled Today Schedule */}
+        <div className="arch-card p-6 space-y-6">
+          <div className="border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-4">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#6E7179] dark:text-[#A0A4AD]">
+              AGENDA
+            </div>
+            <h3 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED]">
+              Today's Schedule
+            </h3>
+          </div>
+
+          <div className="space-y-3">
+            {todayTasks.length === 0 ? (
+              <div className="p-6 text-center border border-dashed border-[#E8E5DF] dark:border-[#2B2D34]">
+                <CheckSquare className="w-6 h-6 text-[#A0A4AD] mx-auto mb-2" />
+                <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD]">No works scheduled for today.</p>
+              </div>
+            ) : (
+              todayTasks.map((t) => (
+                <div key={t.id} className="p-3 bg-[#FAF8F5] dark:bg-[#121316] border-l-2 border-[#16171A] dark:border-[#F4F2ED] space-y-1">
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-xs font-bold text-[#16171A] dark:text-[#F4F2ED]">
+                      {t.title || t.name}
+                    </h4>
+                    <span className="text-[10px] font-mono text-[#6E7179] dark:text-[#A0A4AD]">
+                      {t.progress}%
+                    </span>
+                  </div>
+                  {t.room?.name && (
+                    <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD]">
+                      Location: {t.room.name}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+      </section>
+
+      {/* 📷 RECENT SITE INSPECTION GALLERY */}
+      <section className="arch-card p-6 space-y-6">
+        <div className="flex justify-between items-center border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-4">
+          <div>
+            <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#6E7179] dark:text-[#A0A4AD]">
+              PHOTOGRAPHIC EVIDENCE
+            </div>
+            <h3 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED]">
+              Recent Site Inspections
+            </h3>
+          </div>
+          <Camera className="w-5 h-5 text-[#6E7179] dark:text-[#A0A4AD]" />
         </div>
 
         {recentPhotos.length === 0 ? (
-          <div className="p-8 text-center border border-dashed border-slate-800 rounded-2xl">
-            <Camera className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-400">No Site Photos Uploaded Yet</p>
+          <div className="p-8 text-center border border-dashed border-[#E8E5DF] dark:border-[#2B2D34]">
+            <Camera className="w-8 h-8 text-[#A0A4AD] mx-auto mb-2" />
+            <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD]">No site photos logged yet.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {recentPhotos.map((p) => (
-              <div key={p.id} className="glass-card rounded-xl overflow-hidden group space-y-1.5 p-2">
-                <div className="aspect-video rounded-lg overflow-hidden bg-slate-950 relative">
-                  <img
-                    src={p.url}
-                    alt={p.caption || 'Site Photo'}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <div className="p-1">
-                  <p className="text-[10px] font-semibold text-slate-200 truncate">{p.caption || 'Site Inspection'}</p>
-                  <p className="text-[9px] text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {recentPhotos.map((photo) => (
+              <div key={photo.id} className="arch-image-card aspect-square group cursor-pointer border border-[#E8E5DF] dark:border-[#2B2D34]">
+                <img 
+                  src={photo.url} 
+                  alt={photo.caption || 'Site Photo'} 
+                  loading="lazy" 
+                />
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-end text-[10px] text-white">
+                  <p className="font-semibold truncate">{photo.caption || 'Site Inspection'}</p>
+                  <p className="text-[8px] text-white/70">{new Date(photo.createdAt).toLocaleDateString()}</p>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
     </div>
   );

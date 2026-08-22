@@ -9,19 +9,13 @@ import {
   Loader2, 
   AlertTriangle, 
   X,
-  Home,
-  FolderKanban,
-  GitMerge,
   Clock,
   CheckCircle2,
-  HardHat,
-  UserCheck,
-  Users,
   ShieldCheck,
   PauseCircle,
   PlayCircle,
   Camera,
-  Image as ImageIcon,
+  ImageIcon,
   Upload,
   FileText,
   Paperclip,
@@ -162,15 +156,6 @@ const Tasks: React.FC = () => {
   const [submittingNote, setSubmittingNote] = useState(false);
   const [noteContent, setNoteContent] = useState('');
   const [noteAttachment, setNoteAttachment] = useState<File | null>(null);
-
-  // Calculate estimated days dynamically
-  const calculateEstimatedDays = (startStr: string, endStr: string): number => {
-    if (!startStr || !endStr) return 1;
-    const startMs = new Date(startStr).getTime();
-    const endMs = new Date(endStr).getTime();
-    if (isNaN(startMs) || isNaN(endMs)) return 1;
-    return Math.max(1, Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)));
-  };
 
   const fetchData = async () => {
     try {
@@ -432,15 +417,6 @@ const Tasks: React.FC = () => {
     }
   };
 
-  const getPriorityBadge = (prio: string) => {
-    switch (prio) {
-      case 'URGENT': return 'bg-red-500/10 text-red-400 border-red-500/20';
-      case 'HIGH': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-      case 'MEDIUM': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-      default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    }
-  };
-
   const getStatusConfig = (status: TaskStatus) => {
     switch (status) {
       case 'NOT_STARTED':
@@ -575,161 +551,151 @@ const Tasks: React.FC = () => {
         </div>
       )}
 
-      {/* TASKS LIST */}
+      {/* ARCHITECTURAL TABLE-LIST HYBRID */}
       {loading ? (
-        <div className="glass-card p-12 text-center rounded-2xl">
-          <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Connecting to PostgreSQL Database...</p>
+        <div className="arch-card p-12 text-center">
+          <Loader2 className="w-8 h-8 text-[#16171A] dark:text-[#F4F2ED] animate-spin mx-auto mb-3" />
+          <p className="text-[#6E7179] dark:text-[#A0A4AD] text-xs font-medium uppercase tracking-wider">Connecting to PostgreSQL...</p>
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="glass-card p-12 text-center rounded-2xl">
-          <CheckSquare className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-300 text-sm font-semibold">No Tasks Found</p>
-          <p className="text-slate-500 text-xs mt-1">Create your first task and attach Rich Text notes & attachments.</p>
+        <div className="arch-card p-16 text-center">
+          <CheckSquare className="w-12 h-12 text-[#8C8F99] mx-auto mb-3" />
+          <h3 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED]">No Works Registered</h3>
+          <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1 max-w-xs mx-auto">
+            Create your first work task and attach site notes & photographic logs.
+          </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredTasks.map((task) => {
-            const daysEst = task.estimatedDays || calculateEstimatedDays(task.startDate, task.endDate);
-            const statusConfig = getStatusConfig(task.status);
-            const StatusIcon = statusConfig.icon;
+        <div className="arch-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-[#E8E5DF] dark:border-[#2B2D34] bg-[#FAF8F5] dark:bg-[#121316] text-[10px] font-semibold uppercase tracking-wider text-[#6E7179] dark:text-[#A0A4AD]">
+                  <th className="p-4">Work / Task</th>
+                  <th className="p-4">Category & Sub Work</th>
+                  <th className="p-4">Location / Room</th>
+                  <th className="p-4">Contractor</th>
+                  <th className="p-4">Priority</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Completion</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8E5DF]/60 dark:divide-[#2B2D34]/60">
+                {filteredTasks.map((task) => {
+                  const statusConfig = getStatusConfig(task.status);
+                  const StatusIcon = statusConfig.icon;
 
-            return (
-              <div key={task.id} className="glass-card p-5 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 relative group">
-                
-                {/* Left: Interactive Status Button & Title & Assignments */}
-                <div className="flex items-start gap-3.5 w-full lg:w-auto">
-                  <button
-                    onClick={() => handleCycleStatus(task)}
-                    title={`Current: ${statusConfig.label}. Click to cycle status.`}
-                    className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-all mt-0.5 flex-shrink-0 ${statusConfig.badge}`}
-                  >
-                    <StatusIcon className="w-4 h-4" />
-                  </button>
-
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold">
-                      {task.subWork?.category && (
-                        <span className="flex items-center gap-1 text-brand-400 font-extrabold uppercase tracking-widest bg-brand-500/10 px-2 py-0.5 rounded border border-brand-500/20">
-                          <FolderKanban className="w-3 h-3" />
-                          {task.subWork.category.name}
-                        </span>
-                      )}
-
-                      {task.subWork && (
-                        <span className="flex items-center gap-1 text-slate-300 font-bold bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                          <GitMerge className="w-3 h-3 text-slate-400" />
-                          {task.subWork.name}
-                        </span>
-                      )}
-
-                      {task.room && (
-                        <span className="flex items-center gap-1 text-slate-400 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                          <Home className="w-3 h-3 text-slate-500" />
-                          {task.room.floor?.name} → {task.room.name}
-                        </span>
-                      )}
-                    </div>
-
-                    <h4 className="text-base font-extrabold text-white leading-tight">
-                      {task.title || task.name}
-                    </h4>
-
-                    {/* WORKFORCE BADGES */}
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold pt-0.5">
-                      <span className="flex items-center gap-1 text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                        <HardHat className="w-3 h-3 text-amber-400" />
-                        {task.contractor?.name || 'Contractor'}
-                      </span>
-
-                      <span className="flex items-center gap-1 text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
-                        <UserCheck className="w-3 h-3 text-cyan-400" />
-                        {task.supervisor?.name || 'Supervisor'}
-                      </span>
-
-                      <span className="flex items-center gap-1 text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                        <Users className="w-3 h-3 text-emerald-400" />
-                        {task.labourCount || 1} Labour Workers
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center: VISUAL PROGRESS BAR & COMPLETION % */}
-                <div className="w-full lg:w-56 space-y-1.5 bg-slate-900/50 p-3 rounded-xl border border-white/5">
-                  <div className="flex justify-between items-center text-[11px] font-bold">
-                    <span className="text-slate-400 flex items-center gap-1">
-                      <StatusIcon className="w-3 h-3 text-slate-400" />
-                      {statusConfig.label}
-                    </span>
-                    <span className="text-white font-black text-xs">{task.progress}%</span>
-                  </div>
-
-                  {/* Dynamic Visual Progress Bar */}
-                  <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-white/5">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${statusConfig.barBg}`}
-                      style={{ width: `${Math.max(4, task.progress)}%` }}
-                    />
-                  </div>
-
-                  <div className="flex justify-between text-[9px] text-slate-500 font-bold pt-1">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Est. {daysEst} Days</span>
-                    <span>{new Date(task.startDate).toLocaleDateString()} - {new Date(task.endDate).toLocaleDateString()}</span>
-                  </div>
-                </div>
-
-                {/* Right: Badges, Photos & Notes Buttons */}
-                <div className="flex items-center justify-between lg:justify-end gap-2 w-full lg:w-auto border-t lg:border-t-0 border-white/5 pt-3 lg:pt-0">
-                  
-                  {/* RICH TEXT NOTES BUTTON */}
-                  <button
-                    onClick={() => handleOpenNotesModal(task)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 hover:bg-purple-600 hover:text-white font-bold text-xs transition-all shadow-sm"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Notes</span>
-                  </button>
-
-                  {/* SUPABASE PHOTO GALLERY BUTTON */}
-                  <button
-                    onClick={() => handleOpenGallery(task)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-300 hover:bg-brand-500 hover:text-white font-bold text-xs transition-all shadow-sm"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Photos</span>
-                  </button>
-
-                  <div className="flex items-center gap-1 font-black">
-                    <span className={`text-[9px] border px-2 py-1 rounded-lg uppercase tracking-wider ${statusConfig.badge}`}>
-                      {statusConfig.label}
-                    </span>
-                    <span className={`text-[9px] border px-2 py-1 rounded-lg uppercase tracking-wider ${getPriorityBadge(task.priority)}`}>
-                      {task.priority}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEditModal(task)}
-                      className="p-1.5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg transition-all"
-                      title="Edit Task"
+                  return (
+                    <tr 
+                      key={task.id} 
+                      className="hover:bg-[#FAF8F5] dark:hover:bg-[#121316]/50 transition-colors group"
                     >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(task.id, task.title || task.name || 'Task')}
-                      className="p-1.5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 rounded-lg transition-all"
-                      title="Delete Task"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                      {/* Task Title */}
+                      <td className="p-4 font-semibold text-[#16171A] dark:text-[#F4F2ED]">
+                        <div className="font-medium text-sm leading-snug">{task.title || task.name}</div>
+                        <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD] font-mono mt-0.5">
+                          {new Date(task.startDate).toLocaleDateString()} &nbsp;—&nbsp; {new Date(task.endDate).toLocaleDateString()}
+                        </div>
+                      </td>
 
-              </div>
-            );
-          })}
+                      {/* Category & Sub Work */}
+                      <td className="p-4 text-[#16171A] dark:text-[#F4F2ED]">
+                        <div className="font-medium">{task.subWork?.category?.name || 'General'}</div>
+                        <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD]">{task.subWork?.name || 'Standard Work'}</div>
+                      </td>
+
+                      {/* Room / Location */}
+                      <td className="p-4 text-[#6E7179] dark:text-[#A0A4AD]">
+                        {task.room ? (
+                          <span>{task.room.floor?.name} &nbsp;→&nbsp; {task.room.name}</span>
+                        ) : (
+                          <span className="italic opacity-60">Unassigned</span>
+                        )}
+                      </td>
+
+                      {/* Contractor */}
+                      <td className="p-4 font-medium text-[#16171A] dark:text-[#F4F2ED]">
+                        {task.contractor?.name || 'Contractor Team'}
+                      </td>
+
+                      {/* Priority */}
+                      <td className="p-4">
+                        <span className={`text-[9px] font-mono uppercase px-2 py-0.5 border ${
+                          task.priority === 'URGENT' 
+                            ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 border-rose-200' 
+                            : task.priority === 'HIGH'
+                            ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 border-amber-200'
+                            : 'bg-stone-50 dark:bg-stone-900 text-[#6E7179] border-stone-200'
+                        }`}>
+                          {task.priority}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="p-4">
+                        <button
+                          onClick={() => handleCycleStatus(task)}
+                          className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[#16171A] dark:text-[#F4F2ED] hover:underline"
+                          title="Click to cycle status"
+                        >
+                          <StatusIcon className="w-3.5 h-3.5" />
+                          <span>{statusConfig.label}</span>
+                        </button>
+                      </td>
+
+                      {/* Progress */}
+                      <td className="p-4 w-32">
+                        <div className="flex items-center gap-2">
+                          <div className="w-full h-1 bg-[#E8E5DF] dark:bg-[#2B2D34] overflow-hidden">
+                            <div className="h-full bg-[#16171A] dark:bg-[#F4F2ED]" style={{ width: `${Math.max(4, task.progress)}%` }} />
+                          </div>
+                          <span className="font-mono text-[10px] font-bold text-[#16171A] dark:text-[#F4F2ED]">{task.progress}%</span>
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleOpenNotesModal(task)}
+                            className="p-1.5 hover:bg-[#EFECE6] dark:hover:bg-[#23252C] text-[#6E7179] hover:text-[#16171A] dark:hover:text-[#F4F2ED]"
+                            title="Notes & Site Log"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenGallery(task)}
+                            className="p-1.5 hover:bg-[#EFECE6] dark:hover:bg-[#23252C] text-[#6E7179] hover:text-[#16171A] dark:hover:text-[#F4F2ED]"
+                            title="Photo Inspection"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenEditModal(task)}
+                            className="p-1.5 hover:bg-[#EFECE6] dark:hover:bg-[#23252C] text-[#6E7179] hover:text-[#16171A] dark:hover:text-[#F4F2ED]"
+                            title="Edit Work"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleDelete(task.id, task.title || task.name || 'Work')}
+                            className="p-1.5 hover:bg-rose-50 text-[#6E7179] hover:text-rose-600"
+                            title="Delete Work"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

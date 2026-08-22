@@ -3,17 +3,18 @@ import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
   Building2, 
+  CheckSquare, 
+  AlertTriangle, 
+  HardHat,
+  FileSpreadsheet,
+  Camera,
+  Users as UsersIcon,
+  Settings,
   Home,
   FolderKanban,
   GitMerge,
-  CheckSquare, 
   Calendar,
-  AlertTriangle, 
-  FileSpreadsheet,
-  Users as UsersIcon,
   Eye,
-  Settings, 
-  HardHat,
   ChevronLeft,
   ChevronRight,
   LogOut
@@ -34,20 +35,24 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, logout } = useAuth();
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  const mainNav = [
+    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'projects', label: 'Projects', icon: Building2 },
+    { id: 'tasks', label: 'Works', icon: CheckSquare },
+    { id: 'snags', label: 'Snags', icon: AlertTriangle },
+    { id: 'contractor', label: 'Contractors', icon: HardHat },
+    { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
+    { id: 'photos', label: 'Photos', icon: Camera },
+    { id: 'users', label: 'Team', icon: UsersIcon },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const secondaryNav = [
     { id: 'rooms', label: 'Rooms', icon: Home },
     { id: 'categories', label: 'Categories', icon: FolderKanban },
     { id: 'subworks', label: 'Sub Works', icon: GitMerge },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
     { id: 'timeline', label: 'Timeline', icon: Calendar },
-    { id: 'snags', label: 'Snag List', icon: AlertTriangle },
-    { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
-    { id: 'users', label: 'Team & Users', icon: UsersIcon },
     { id: 'client', label: 'Client Portal', icon: Eye },
-    { id: 'contractor', label: 'Contractor Portal', icon: HardHat },
-    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   const getInitials = (name?: string) => {
@@ -59,77 +64,116 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside 
-      className={`glass-panel h-screen fixed left-0 top-0 z-30 transition-all duration-300 border-r border-white/5 flex flex-col justify-between ${
+      className={`bg-white dark:bg-[#18191D] h-screen fixed left-0 top-0 z-40 transition-all duration-300 border-r border-[#E8E5DF] dark:border-[#2B2D34] flex flex-col justify-between ${
         collapsed ? 'w-20' : 'w-64'
       }`}
     >
       <div>
-        {/* Logo Section */}
-        <div className="p-6 flex items-center justify-between border-b border-white/5">
+        {/* Project / Company Identity */}
+        <div className="p-6 flex items-center justify-between border-b border-[#E8E5DF] dark:border-[#2B2D34]">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 bg-brand-500/20 border border-brand-500/30 rounded-xl flex items-center justify-center text-brand-400 shadow-[0_0_15px_rgba(14,160,234,0.25)] flex-shrink-0">
-              <HardHat className="w-5 h-5" />
+            <div className="w-8 h-8 bg-[#16171A] dark:bg-[#F4F2ED] text-[#FAF8F5] dark:text-[#16171A] flex items-center justify-center font-serif text-sm font-bold flex-shrink-0">
+              d.
             </div>
             {!collapsed && (
               <div className="flex flex-col">
-                <span className="text-sm font-black text-white tracking-wider leading-none">DFOLIO</span>
-                <span className="text-[9px] text-brand-400 font-extrabold uppercase tracking-widest mt-1">EXECUTION</span>
+                <span className="font-serif text-base font-bold tracking-tight text-[#16171A] dark:text-[#F4F2ED] leading-none">
+                  d.folio
+                </span>
+                <span className="text-[9px] text-[#6E7179] dark:text-[#A0A4AD] font-medium uppercase tracking-[0.2em] mt-1">
+                  PROJECT CONTROL
+                </span>
               </div>
             )}
           </div>
           
           <button 
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden md:flex p-1.5 hover:bg-white/5 border border-transparent hover:border-white/5 rounded-lg text-slate-400 hover:text-white transition-all"
+            className="hidden md:flex p-1 hover:bg-[#FAF8F5] dark:hover:bg-[#23252C] rounded text-[#6E7179] dark:text-[#A0A4AD] hover:text-[#16171A] dark:hover:text-[#F4F2ED] transition-colors"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-170px)]">
-          {menuItems.map((item) => {
+        {/* Primary Navigation Items */}
+        <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+          <div className="text-[9px] font-semibold text-[#A0A4AD] uppercase tracking-[0.2em] px-3 mb-2">
+            {!collapsed && 'Navigation'}
+          </div>
+
+          {mainNav.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setCurrentTab(item.id)}
-                className={`w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl transition-all duration-200 group relative ${
+                className={`w-full flex items-center gap-3.5 px-3 py-2 text-xs font-medium transition-all duration-200 group relative rounded-sm ${
                   isActive 
-                    ? 'bg-gradient-to-r from-brand-600/30 to-brand-500/10 border border-brand-500/30 text-white shadow-[0_4px_15px_rgba(14,160,234,0.15)]' 
-                    : 'text-slate-400 hover:text-white border border-transparent hover:bg-white/5'
+                    ? 'bg-[#16171A] dark:bg-[#F4F2ED] text-[#FAF8F5] dark:text-[#16171A] font-semibold' 
+                    : 'text-[#6E7179] dark:text-[#A0A4AD] hover:text-[#16171A] dark:hover:text-[#F4F2ED] hover:bg-[#FAF8F5] dark:hover:bg-[#22242B]'
                 }`}
               >
-                <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${
-                  isActive ? 'text-brand-400' : 'text-slate-500 group-hover:text-slate-300'
+                <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                  isActive 
+                    ? 'text-[#FAF8F5] dark:text-[#16171A]' 
+                    : 'text-[#8C8F99] dark:text-[#7A7E88] group-hover:text-[#16171A] dark:group-hover:text-[#F4F2ED]'
                 }`} />
                 {!collapsed && (
-                  <span className="text-sm font-semibold tracking-wide truncate">
+                  <span className="truncate tracking-wide">
                     {item.label}
                   </span>
-                )}
-                {/* Active side indicator */}
-                {isActive && (
-                  <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-brand-500 rounded-r-full" />
                 )}
               </button>
             );
           })}
+
+          {/* Secondary Structural Items */}
+          <div className="pt-4 border-t border-[#E8E5DF]/60 dark:border-[#2B2D34]/60 mt-4">
+            <div className="text-[9px] font-semibold text-[#A0A4AD] uppercase tracking-[0.2em] px-3 mb-2">
+              {!collapsed && 'Structure'}
+            </div>
+            {secondaryNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentTab(item.id)}
+                  className={`w-full flex items-center gap-3.5 px-3 py-2 text-xs font-medium transition-all duration-200 group relative rounded-sm ${
+                    isActive 
+                      ? 'bg-[#16171A] dark:bg-[#F4F2ED] text-[#FAF8F5] dark:text-[#16171A] font-semibold' 
+                      : 'text-[#6E7179] dark:text-[#A0A4AD] hover:text-[#16171A] dark:hover:text-[#F4F2ED] hover:bg-[#FAF8F5] dark:hover:bg-[#22242B]'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                    isActive 
+                      ? 'text-[#FAF8F5] dark:text-[#16171A]' 
+                      : 'text-[#8C8F99] dark:text-[#7A7E88] group-hover:text-[#16171A] dark:group-hover:text-[#F4F2ED]'
+                  }`} />
+                  {!collapsed && (
+                    <span className="truncate tracking-wide">
+                      {item.label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </nav>
       </div>
 
-      {/* User Profile Block */}
-      <div className="p-4 border-t border-white/5">
+      {/* User Profile Footer Block */}
+      <div className="p-4 border-t border-[#E8E5DF] dark:border-[#2B2D34] bg-[#FAF8F5]/50 dark:bg-[#121316]/50">
         <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 bg-brand-600/30 border border-brand-500/40 rounded-xl flex items-center justify-center font-bold text-brand-300 text-xs flex-shrink-0 shadow-lg">
+            <div className="w-8 h-8 bg-[#16171A]/10 dark:bg-[#F4F2ED]/10 border border-[#16171A]/20 dark:border-[#F4F2ED]/20 text-[#16171A] dark:text-[#F4F2ED] flex items-center justify-center font-mono font-bold text-xs flex-shrink-0">
               {getInitials(user?.name)}
             </div>
             {!collapsed && (
               <div className="overflow-hidden">
-                <div className="text-xs font-extrabold text-white truncate">{user?.name || 'User'}</div>
-                <div className="text-[9px] font-bold text-brand-400 uppercase tracking-widest truncate">{user?.role || 'Guest'}</div>
+                <div className="text-xs font-semibold text-[#16171A] dark:text-[#F4F2ED] truncate">{user?.name || 'User'}</div>
+                <div className="text-[9px] font-medium text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider truncate">{user?.role || 'Guest'}</div>
               </div>
             )}
           </div>
@@ -137,7 +181,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {!collapsed && (
             <button
               onClick={logout}
-              className="p-2 hover:bg-rose-500/10 rounded-lg text-slate-400 hover:text-rose-400 transition-colors"
+              className="p-1.5 hover:bg-rose-500/10 text-[#6E7179] hover:text-rose-600 transition-colors rounded"
               title="Sign Out"
             >
               <LogOut className="w-4 h-4" />

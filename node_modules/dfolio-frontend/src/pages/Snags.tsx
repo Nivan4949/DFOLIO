@@ -4,16 +4,13 @@ import {
   AlertTriangle, 
   Plus, 
   Edit3, 
-  Trash2, 
+  Trash2,
   Loader2, 
   X,
   Home,
-  CheckSquare,
   HardHat,
-  Camera,
-  FileText,
-  Calendar,
-  Download
+  Download,
+  Sliders
 } from 'lucide-react';
 import { exportToCSV } from '../utils/exportUtils';
 
@@ -77,10 +74,70 @@ interface SnagItem {
   notes?: NoteItem[];
 }
 
+// Architectural Before / After Draggable Slider Component
+const BeforeAfterSlider: React.FC<{ beforeUrl: string; afterUrl: string }> = ({ beforeUrl, afterUrl }) => {
+  const [sliderPos, setSliderPos] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMove = (clientX: number, rect: DOMRect) => {
+    const x = clientX - rect.left;
+    const pos = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    setSliderPos(pos);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleMove(e.touches[0].clientX, rect);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleMove(e.clientX, rect);
+  };
+
+  return (
+    <div 
+      className="before-after-slider h-80 cursor-ew-resize relative"
+      onMouseDown={() => setIsDragging(true)}
+      onMouseUp={() => setIsDragging(false)}
+      onMouseLeave={() => setIsDragging(false)}
+      onMouseMove={handleMouseMove}
+      onTouchMove={handleTouchMove}
+    >
+      {/* After Image (Background) */}
+      <img src={afterUrl} alt="After Fix" className="w-full h-full object-cover absolute inset-0" />
+      <div className="absolute top-3 right-3 bg-emerald-600 text-white font-mono text-[9px] uppercase px-2 py-0.5 z-10 font-bold">
+        AFTER FIX
+      </div>
+
+      {/* Before Image (Clipped Overlay) */}
+      <div 
+        className="absolute inset-0 overflow-hidden"
+        style={{ width: `${sliderPos}%` }}
+      >
+        <img src={beforeUrl} alt="Before Fix" className="w-full h-full object-cover max-w-none" style={{ width: '100%', height: '100%' }} />
+        <div className="absolute top-3 left-3 bg-rose-600 text-white font-mono text-[9px] uppercase px-2 py-0.5 z-10 font-bold">
+          BEFORE (DEFECT)
+        </div>
+      </div>
+
+      {/* Draggable Vertical Divider Handle */}
+      <div 
+        className="absolute top-0 bottom-0 w-0.5 bg-white shadow-2xl z-20"
+        style={{ left: `${sliderPos}%` }}
+      >
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 bg-white dark:bg-[#121316] border border-[#16171A] text-[#16171A] dark:text-[#F4F2ED] rounded-full flex items-center justify-center shadow-lg">
+          <Sliders className="w-4 h-4" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Snags: React.FC = () => {
   const [snags, setSnags] = useState<SnagItem[]>([]);
   const [rooms, setRooms] = useState<RoomOption[]>([]);
-  const [tasks, setTasks] = useState<TaskOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -108,8 +165,9 @@ const Snags: React.FC = () => {
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Active Snag Details / Photo & Notes Drawer State
+  // Active Snag Details & Before/After Modal
   const [activeSnag, setActiveSnag] = useState<SnagItem | null>(null);
+  const [compareSnag, setCompareSnag] = useState<SnagItem | null>(null);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
 
@@ -117,16 +175,14 @@ const Snags: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      const [snagsRes, roomsRes, tasksRes, usersRes] = await Promise.all([
+      const [snagsRes, roomsRes, usersRes] = await Promise.all([
         client.get('/api/snags'),
         client.get('/api/rooms'),
-        client.get('/api/tasks'),
         client.get('/api/auth/users').catch(() => ({ data: [] })),
       ]);
 
       setSnags(snagsRes.data);
       setRooms(roomsRes.data);
-      setTasks(tasksRes.data);
       setUsers(usersRes.data || []);
       if (roomsRes.data.length > 0 && !formData.roomId) {
         setFormData(prev => ({ ...prev, roomId: roomsRes.data[0].id }));
@@ -159,7 +215,8 @@ const Snags: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleOpenEditModal = (snag: SnagItem) => {
+  const handleOpenEditModal = (snag: SnagItem, e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditingSnag(snag);
     setFormData({
       title: snag.title,
@@ -190,7 +247,6 @@ const Snags: React.FC = () => {
         photoData.append('photo', formData.photoFile);
         photoData.append('caption', `Defect Snag: ${formData.title}`);
         
-        // Upload photo via API
         const uploadRes = await client.post('/api/photos/upload', photoData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -210,22 +266,21 @@ const Snags: React.FC = () => {
       };
 
       if (editingSnag) {
-        // UPDATE
         await client.put(`/api/snags/${editingSnag.id}`, payload);
       } else {
-        // CREATE
         await client.post('/api/snags', payload);
       }
       setShowModal(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save snag record to database');
+      alert(err.response?.data?.error || 'Failed to save snag record');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
+  const handleDelete = async (id: string, title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!window.confirm(`Are you sure you want to delete snag '${title}'?`)) return;
 
     try {
@@ -236,7 +291,8 @@ const Snags: React.FC = () => {
     }
   };
 
-  const handleCycleStatus = async (snag: SnagItem) => {
+  const handleCycleStatus = async (snag: SnagItem, e: React.MouseEvent) => {
+    e.stopPropagation();
     const cycle: SnagStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
     const idx = cycle.indexOf(snag.status);
     const nextStatus = cycle[(idx + 1) % cycle.length];
@@ -274,25 +330,6 @@ const Snags: React.FC = () => {
     }
   };
 
-  const getPriorityBadge = (prio: string) => {
-    switch (prio) {
-      case 'URGENT': return 'bg-red-500/10 text-red-400 border-red-500/20';
-      case 'HIGH': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-      case 'MEDIUM': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-      default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    }
-  };
-
-  const getStatusBadge = (status: SnagStatus) => {
-    switch (status) {
-      case 'OPEN': return 'bg-red-500/10 text-red-400 border-red-500/20';
-      case 'IN_PROGRESS': return 'bg-brand-500/10 text-brand-400 border-brand-500/20';
-      case 'RESOLVED': return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
-      case 'CLOSED': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    }
-  };
-
   const filteredSnags = snags.filter(s => {
     if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
     if (priorityFilter !== 'ALL' && s.priority !== priorityFilter) return false;
@@ -315,71 +352,68 @@ const Snags: React.FC = () => {
     exportToCSV(formatted, 'DFOLIO_Defect_Snag_List');
   };
 
+  const DEFAULT_BEFORE_IMG = 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1000&q=80';
+  const DEFAULT_AFTER_IMG = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=80';
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* HEADER WITH CONTROLS */}
-      <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-10 animate-fade-in">
+      
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-6">
         <div>
-          <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
-            Snag & Defect Management
-          </h3>
-          <p className="text-xs text-slate-400">
-            Track site defects with Photo, Priority, Deadline, Assigned Labour, Status, Notes, Room, and Task context.
+          <div className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#6E7179] dark:text-[#A0A4AD]">
+            QUALITY ASSURANCE & SNAGGING
+          </div>
+          <h2 className="font-serif text-3xl font-bold text-[#16171A] dark:text-[#F4F2ED] tracking-tight mt-1">
+            Snag & Defect Control
+          </h2>
+          <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1 max-w-xl">
+            Image-first quality defect management, location tagging, and before/after resolution verification.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 self-start md:self-auto">
           <button
             onClick={handleExportCSV}
-            className="flex items-center justify-center gap-1.5 py-2 px-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold rounded-xl text-xs transition-all"
-            title="Export Defect Snag List to CSV File"
+            className="arch-btn-secondary flex items-center gap-2"
           >
-            <Download className="w-4 h-4 text-emerald-400" />
-            Export CSV
+            <Download className="w-3.5 h-3.5" /> Export
           </button>
 
           <button
             onClick={handleOpenAddModal}
-            className="flex items-center justify-center gap-2 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(239,68,68,0.25)]"
+            className="arch-btn-primary flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" />
-            Create Snag
+            <Plus className="w-4 h-4" /> Create Snag
           </button>
         </div>
       </div>
 
-      {/* FILTER BAR */}
-      <div className="glass-card p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+      {/* FILTER CONTROLS */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-slate-400 mr-1">Status:</span>
-          {([
-            { id: 'ALL', label: 'All' },
-            { id: 'OPEN', label: 'Open' },
-            { id: 'IN_PROGRESS', label: 'In Progress' },
-            { id: 'RESOLVED', label: 'Resolved' },
-            { id: 'CLOSED', label: 'Closed' },
-          ] as const).map((s) => (
+          <span className="text-xs font-semibold text-[#6E7179] dark:text-[#A0A4AD] mr-2">STATUS:</span>
+          {['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map((s) => (
             <button
-              key={s.id}
-              onClick={() => setStatusFilter(s.id)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                statusFilter === s.id
-                  ? 'bg-red-600 text-white shadow-md'
-                  : 'bg-slate-800/40 border border-slate-700/30 text-slate-400 hover:text-white'
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`text-xs font-mono px-3 py-1 border transition-all ${
+                statusFilter === s
+                  ? 'bg-[#16171A] dark:bg-[#F4F2ED] text-[#FAF8F5] dark:text-[#16171A] border-[#16171A] dark:border-[#F4F2ED]'
+                  : 'bg-transparent border-[#E8E5DF] dark:border-[#2B2D34] text-[#6E7179] dark:text-[#A0A4AD] hover:border-[#16171A]'
               }`}
             >
-              {s.label}
+              {s}
             </button>
           ))}
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-400">Priority:</span>
+          <span className="text-xs font-semibold text-[#6E7179] dark:text-[#A0A4AD]">PRIORITY:</span>
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-xl glass-input text-xs cursor-pointer bg-slate-900"
+            className="p-1.5 arch-input font-mono text-xs cursor-pointer"
           >
             <option value="ALL">All Priorities</option>
             <option value="LOW">Low</option>
@@ -391,136 +425,110 @@ const Snags: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-950/40 border border-red-500/30 text-red-200 text-sm rounded-xl flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-200 text-xs rounded-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
           {error}
         </div>
       )}
 
-      {/* SNAGS GRID LIST */}
+      {/* IMAGE-FIRST SNAG CARDS GRID */}
       {loading ? (
-        <div className="glass-card p-12 text-center rounded-2xl">
-          <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Connecting to PostgreSQL Database...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-80 arch-skeleton" />
+          ))}
         </div>
       ) : filteredSnags.length === 0 ? (
-        <div className="glass-card p-12 text-center rounded-2xl">
-          <AlertTriangle className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-300 text-sm font-semibold">No Snags Found</p>
-          <p className="text-slate-500 text-xs mt-1">Create your first snag and assign Room, Task, Labour, Deadline & Photo.</p>
+        <div className="arch-card p-16 text-center">
+          <AlertTriangle className="w-12 h-12 text-[#8C8F99] mx-auto mb-3" />
+          <h3 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED]">No Snags Logged</h3>
+          <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1 max-w-xs mx-auto">
+            Log defect items with room tagging and defect photos.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredSnags.map((snag) => {
             const hasPhoto = snag.photos && snag.photos.length > 0;
-            const photoUrl = hasPhoto ? snag.photos![0].url : null;
+            const photoUrl = hasPhoto ? snag.photos![0].url : DEFAULT_BEFORE_IMG;
 
             return (
-              <div key={snag.id} className="glass-card p-5 rounded-2xl space-y-4 relative group flex flex-col justify-between">
-                <div className="space-y-3">
-                  {/* Photo Preview Thumbnail */}
-                  {photoUrl ? (
-                    <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-950 border border-white/5">
-                      <img src={photoUrl} alt={snag.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm text-[10px] font-bold text-white flex items-center gap-1">
-                        <Camera className="w-3 h-3 text-brand-400" /> Photo Attached
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="aspect-video rounded-xl bg-slate-900/50 border border-dashed border-slate-800 flex items-center justify-center text-slate-600">
-                      <Camera className="w-8 h-8 opacity-40" />
-                    </div>
-                  )}
+              <div 
+                key={snag.id} 
+                onClick={() => setActiveSnag(snag)}
+                className="arch-card arch-image-card group h-[380px] cursor-pointer flex flex-col justify-between"
+              >
+                {/* Visual Image Banner */}
+                <img 
+                  src={photoUrl} 
+                  alt={snag.title} 
+                  loading="lazy" 
+                />
 
-                  {/* Room & Task context tags */}
-                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
-                    {snag.room && (
-                      <span className="flex items-center gap-1 text-slate-300 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                        <Home className="w-3 h-3 text-slate-400" />
-                        {snag.room.floor?.project?.name ? `${snag.room.floor.project.name} → ` : ''}{snag.room.floor?.name} → {snag.room.name}
-                      </span>
-                    )}
-
-                    {snag.task && (
-                      <span className="flex items-center gap-1 text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded border border-brand-500/20">
-                        <CheckSquare className="w-3 h-3 text-brand-400" />
-                        Task: {snag.task.name}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Title & Description */}
-                  <div>
-                    <h4 className="text-base font-extrabold text-white leading-tight">
-                      {snag.title}
-                    </h4>
-                    {snag.description && (
-                      <p className="text-xs text-slate-400 line-clamp-2 mt-1">{snag.description}</p>
-                    )}
-                  </div>
-
-                  {/* Assigned Labour & Deadline */}
-                  <div className="space-y-1.5 pt-1 text-[11px]">
-                    <div className="flex items-center justify-between text-slate-300 font-semibold">
-                      <span className="flex items-center gap-1 text-slate-400">
-                        <HardHat className="w-3.5 h-3.5 text-amber-400" />
-                        Assigned Labour:
-                      </span>
-                      <span className="text-white font-bold">{snag.assignedTo?.name || 'Unassigned'}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-slate-300 font-semibold">
-                      <span className="flex items-center gap-1 text-slate-400">
-                        <Calendar className="w-3.5 h-3.5 text-red-400" />
-                        Deadline:
-                      </span>
-                      <span className="text-red-300 font-bold">
-                        {snag.dueDate ? new Date(snag.dueDate).toLocaleDateString() : 'No Deadline'}
-                      </span>
-                    </div>
-                  </div>
+                {/* Top Status & Priority Tags */}
+                <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+                  <button
+                    onClick={(e) => handleCycleStatus(snag, e)}
+                    className="text-[9px] font-mono uppercase tracking-widest bg-[#16171A]/90 text-[#FAF8F5] px-2 py-0.5 backdrop-blur-md hover:underline cursor-pointer"
+                    title="Click to cycle status"
+                  >
+                    {snag.status}
+                  </button>
+                  <span className={`text-[9px] font-mono uppercase tracking-widest px-2 py-0.5 backdrop-blur-md ${
+                    snag.priority === 'URGENT' ? 'bg-rose-600 text-white' : 'bg-black/60 text-white'
+                  }`}>
+                    {snag.priority}
+                  </span>
                 </div>
 
-                {/* Footer Controls & Badges */}
-                <div className="border-t border-white/5 pt-3 mt-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleCycleStatus(snag)}
-                      className={`text-[9px] font-black border px-2 py-0.5 rounded-md uppercase tracking-wider transition-all ${getStatusBadge(snag.status)}`}
-                      title="Click to cycle status"
-                    >
-                      {snag.status}
-                    </button>
+                {/* Top Action Triggers */}
+                <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setCompareSnag(snag); }}
+                    className="p-2 bg-white/90 dark:bg-black/90 text-[#16171A] dark:text-[#F4F2ED] hover:bg-white backdrop-blur-md transition-all"
+                    title="Compare Before / After"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => handleOpenEditModal(snag, e)}
+                    className="p-2 bg-white/90 dark:bg-black/90 text-[#16171A] dark:text-[#F4F2ED] hover:bg-white backdrop-blur-md transition-all"
+                    title="Edit Snag"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(snag.id, snag.title, e)}
+                    className="p-2 bg-white/90 dark:bg-black/90 text-rose-600 hover:bg-white backdrop-blur-md transition-all"
+                    title="Delete Snag"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-                    <span className={`text-[9px] font-black border px-2 py-0.5 rounded-md uppercase tracking-wider ${getPriorityBadge(snag.priority)}`}>
-                      {snag.priority}
-                    </span>
-                  </div>
+                {/* Content Overlay */}
+                <div className="arch-image-overlay">
+                  <div className="transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 space-y-2">
+                    {snag.room && (
+                      <div className="text-[10px] font-semibold text-white/70 uppercase tracking-widest flex items-center gap-1">
+                        <Home className="w-3.5 h-3.5" /> {snag.room.floor?.name} &nbsp;→&nbsp; {snag.room.name}
+                      </div>
+                    )}
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setActiveSnag(snag)}
-                      className="p-1.5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg transition-all"
-                      title="View Details & Notes"
-                    >
-                      <FileText className="w-4 h-4 text-purple-400" />
-                    </button>
+                    <h3 className="font-serif text-xl font-bold text-white tracking-tight leading-snug">
+                      {snag.title}
+                    </h3>
 
-                    <button
-                      onClick={() => handleOpenEditModal(snag)}
-                      className="p-1.5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg transition-all"
-                      title="Edit Snag"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-between pt-2 border-t border-white/20 text-xs text-white/90">
+                      <span className="flex items-center gap-1">
+                        <HardHat className="w-3.5 h-3.5 text-white/70" />
+                        {snag.assignedTo?.name || 'Unassigned'}
+                      </span>
 
-                    <button
-                      onClick={() => handleDelete(snag.id, snag.title)}
-                      className="p-1.5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 rounded-lg transition-all"
-                      title="Delete Snag"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <div className="font-mono text-[10px] text-white">
+                        Due: {snag.dueDate ? new Date(snag.dueDate).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -530,56 +538,73 @@ const Snags: React.FC = () => {
         </div>
       )}
 
-      {/* DETAILED SNAG & NOTES DRAWER MODAL */}
-      {activeSnag && (
+      {/* 🏛️ BEFORE / AFTER COMPARISON VIEWER MODAL */}
+      {compareSnag && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-2xl glass-panel p-6 rounded-2xl shadow-2xl relative my-8 space-y-6">
+          <div className="w-full max-w-3xl bg-white dark:bg-[#18191D] border border-[#E8E5DF] dark:border-[#2B2D34] p-8 shadow-arch relative my-8 space-y-6">
             <button
-              onClick={() => setActiveSnag(null)}
-              className="absolute right-4 top-4 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
+              onClick={() => setCompareSnag(null)}
+              className="absolute right-4 top-4 p-1 text-[#6E7179] hover:text-[#16171A] dark:hover:text-[#F4F2ED]"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[9px] font-black border px-2 py-0.5 rounded uppercase tracking-wider ${getStatusBadge(activeSnag.status)}`}>
-                  {activeSnag.status}
-                </span>
-                <span className={`text-[9px] font-black border px-2 py-0.5 rounded uppercase tracking-wider ${getPriorityBadge(activeSnag.priority)}`}>
-                  {activeSnag.priority}
-                </span>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#6E7179] dark:text-[#A0A4AD]">
+                INTERACTIVE COMPARISON VIEWER
               </div>
-              <h3 className="text-xl font-bold text-white mt-2">{activeSnag.title}</h3>
+              <h3 className="font-serif text-2xl font-bold text-[#16171A] dark:text-[#F4F2ED] mt-1">
+                Before / After Verification: {compareSnag.title}
+              </h3>
+              <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1">
+                Drag the divider slider left or right to compare initial defect state against resolved work.
+              </p>
+            </div>
+
+            {/* Draggable Split Viewer */}
+            <BeforeAfterSlider 
+              beforeUrl={compareSnag.photos && compareSnag.photos.length > 0 ? compareSnag.photos[0].url : DEFAULT_BEFORE_IMG}
+              afterUrl={compareSnag.photos && compareSnag.photos.length > 1 ? compareSnag.photos[1].url : DEFAULT_AFTER_IMG}
+            />
+
+            <div className="flex justify-end pt-2">
+              <button onClick={() => setCompareSnag(null)} className="arch-btn-secondary">
+                Close Viewer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DETAILED SNAG DRAWER MODAL */}
+      {activeSnag && !compareSnag && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white dark:bg-[#18191D] border border-[#E8E5DF] dark:border-[#2B2D34] p-8 shadow-arch relative my-8 space-y-6">
+            <button
+              onClick={() => setActiveSnag(null)}
+              className="absolute right-4 top-4 p-1 text-[#6E7179] hover:text-[#16171A] dark:hover:text-[#F4F2ED]"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-widest text-[#6E7179] dark:text-[#A0A4AD]">
+                {activeSnag.status} &nbsp;•&nbsp; {activeSnag.priority} PRIORITY
+              </div>
+              <h3 className="font-serif text-2xl font-bold text-[#16171A] dark:text-[#F4F2ED] mt-1">{activeSnag.title}</h3>
               {activeSnag.description && (
-                <p className="text-xs text-slate-300 mt-1">{activeSnag.description}</p>
+                <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-2 leading-relaxed">{activeSnag.description}</p>
               )}
             </div>
 
-            {/* Photos Carousel */}
-            {activeSnag.photos && activeSnag.photos.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-brand-400" /> Defect Inspection Photos
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {activeSnag.photos.map((p) => (
-                    <img key={p.id} src={p.url} alt="Snag defect" className="w-full aspect-video object-cover rounded-xl border border-white/10" />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ADD NOTE TO SNAG */}
-            <form onSubmit={handleAddSnagNote} className="p-4 bg-slate-900/60 rounded-xl border border-white/10 space-y-3">
-              <div className="text-xs font-extrabold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-4 h-4" /> Add Snag Resolution Note
-              </div>
+            {/* Add Note Form */}
+            <form onSubmit={handleAddSnagNote} className="space-y-3 pt-4 border-t border-[#E8E5DF] dark:border-[#2B2D34]">
+              <div className="text-xs font-semibold text-[#16171A] dark:text-[#F4F2ED]">Add Inspection Resolution Note</div>
               <textarea
                 required
                 rows={2}
-                placeholder="Enter snag inspection update, resolution note, or worker instruction..."
-                className="w-full p-3 rounded-xl glass-input text-xs"
+                placeholder="Enter inspection update or worker note..."
+                className="w-full p-2.5 arch-input"
                 value={newNoteContent}
                 onChange={(e) => setNewNoteContent(e.target.value)}
               />
@@ -587,35 +612,15 @@ const Snags: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submittingNote || !newNoteContent.trim()}
-                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition-all disabled:opacity-50"
+                  className="arch-btn-primary"
                 >
                   {submittingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Post Note'}
                 </button>
               </div>
             </form>
 
-            {/* NOTES FEED */}
-            <div className="space-y-2 max-h-[250px] overflow-y-auto">
-              {activeSnag.notes && activeSnag.notes.length > 0 ? (
-                activeSnag.notes.map((n) => (
-                  <div key={n.id} className="p-3 bg-slate-950/50 rounded-xl border border-white/5 text-xs text-slate-300 space-y-1">
-                    <div className="flex justify-between text-[10px] text-slate-500 font-bold">
-                      <span>{n.createdBy?.name || 'Inspector'} ({n.createdBy?.role || 'Staff'})</span>
-                      <span>{new Date(n.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <p>{n.content}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-500 italic text-center py-4">No notes posted on this snag yet.</p>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-white/5">
-              <button
-                onClick={() => setActiveSnag(null)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs"
-              >
+            <div className="flex justify-end pt-4">
+              <button onClick={() => setActiveSnag(null)} className="arch-btn-secondary">
                 Close
               </button>
             </div>
@@ -623,63 +628,60 @@ const Snags: React.FC = () => {
         </div>
       )}
 
-      {/* CREATE / EDIT SNAG MODAL */}
+      {/* CREATE / EDIT MODAL */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-lg glass-panel p-6 rounded-2xl shadow-2xl relative my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-[#18191D] border border-[#E8E5DF] dark:border-[#2B2D34] p-8 shadow-arch relative my-8">
             <button
               onClick={() => setShowModal(false)}
-              className="absolute right-4 top-4 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
+              className="absolute right-4 top-4 p-1 text-[#6E7179] hover:text-[#16171A] dark:hover:text-[#F4F2ED]"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-lg font-bold text-white mb-1">
-              {editingSnag ? 'Edit Defect Snag' : 'Create Defect Snag'}
+            <h3 className="font-serif text-2xl font-bold text-[#16171A] dark:text-[#F4F2ED] mb-1">
+              {editingSnag ? 'Edit Snag' : 'Log Defect Snag'}
             </h3>
-            <p className="text-xs text-slate-400 mb-6">
-              Specify Title, Photo, Priority, Deadline, Assigned Labour, Status, Room, and Task context.
+            <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mb-6">
+              Enter defect title, priority, room, deadline, and photo evidence.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Title */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Snag Title / Defect Name *
+                <label className="block text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider mb-1.5">
+                  Snag Title *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Wall Crack near Switchboard / Uneven Tile Joint"
-                  className="w-full px-4 py-2.5 rounded-xl glass-input text-sm"
+                  placeholder="e.g. Tile Misalignment in Living Room"
+                  className="w-full p-2.5 arch-input"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 />
               </div>
 
-              {/* Photo Upload Input */}
               {!editingSnag && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Attach Defect Photo (Supabase Storage)
+                  <label className="block text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider mb-1.5">
+                    Attach Defect Photo
                   </label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => setFormData({ ...formData, photoFile: e.target.files ? e.target.files[0] : null })}
-                    className="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-red-600 file:text-white hover:file:bg-red-500 cursor-pointer"
+                    className="w-full text-xs text-[#6E7179] dark:text-[#A0A4AD] file:mr-3 file:py-1.5 file:px-3 file:border-0 file:text-xs file:font-semibold file:bg-[#16171A] file:text-white cursor-pointer"
                   />
                 </div>
               )}
 
-              {/* Priority & Status */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  <label className="block text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider mb-1.5">
                     Priority
                   </label>
                   <select
-                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm cursor-pointer bg-slate-900 font-semibold"
+                    className="w-full p-2.5 arch-input cursor-pointer"
                     value={formData.priority}
                     onChange={(e) => setFormData({ ...formData, priority: e.target.value as SnagPriority })}
                   >
@@ -691,11 +693,11 @@ const Snags: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  <label className="block text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider mb-1.5">
                     Status
                   </label>
                   <select
-                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm cursor-pointer bg-slate-900 font-semibold"
+                    className="w-full p-2.5 arch-input cursor-pointer"
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as SnagStatus })}
                   >
@@ -707,31 +709,35 @@ const Snags: React.FC = () => {
                 </div>
               </div>
 
-              {/* Deadline & Assigned Labour */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Deadline Date
+                  <label className="block text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider mb-1.5">
+                    Select Room *
                   </label>
-                  <input
-                    type="date"
+                  <select
                     required
-                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm cursor-pointer bg-slate-900"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  />
+                    className="w-full p-2.5 arch-input cursor-pointer"
+                    value={formData.roomId}
+                    onChange={(e) => setFormData({ ...formData, roomId: e.target.value })}
+                  >
+                    {rooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.floor?.name} → {r.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Assigned Labour / Contractor
+                  <label className="block text-[10px] font-semibold text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-wider mb-1.5">
+                    Assigned Labour
                   </label>
                   <select
-                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm cursor-pointer bg-slate-900"
+                    className="w-full p-2.5 arch-input cursor-pointer"
                     value={formData.assignedToId}
                     onChange={(e) => setFormData({ ...formData, assignedToId: e.target.value })}
                   >
-                    <option value="">-- Select Assigned Labour --</option>
+                    <option value="">-- Unassigned --</option>
                     {users.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name} ({u.role})
@@ -741,72 +747,11 @@ const Snags: React.FC = () => {
                 </div>
               </div>
 
-              {/* Room & Task */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Select Room *
-                  </label>
-                  <select
-                    required
-                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm cursor-pointer bg-slate-900"
-                    value={formData.roomId}
-                    onChange={(e) => setFormData({ ...formData, roomId: e.target.value })}
-                  >
-                    {rooms.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.floor?.project?.name ? `${r.floor.project.name} → ` : ''}{r.floor?.name} → {r.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Related Execution Task (Optional)
-                  </label>
-                  <select
-                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm cursor-pointer bg-slate-900"
-                    value={formData.taskId}
-                    onChange={(e) => setFormData({ ...formData, taskId: e.target.value })}
-                  >
-                    <option value="">-- No Task Assigned --</option>
-                    {tasks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name || t.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Description / Notes */}
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Defect Description / Observations
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Describe defect location, required fix, or quality concern..."
-                  className="w-full p-3 rounded-xl glass-input text-sm"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-
               <div className="flex gap-3 justify-end pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all"
-                >
+                <button type="button" onClick={() => setShowModal(false)} className="arch-btn-secondary">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={submitting || rooms.length === 0}
-                  className="flex items-center gap-2 py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(239,68,68,0.25)] disabled:opacity-50"
-                >
+                <button type="submit" disabled={submitting} className="arch-btn-primary">
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : editingSnag ? 'Save Changes' : 'Create Snag'}
                 </button>
               </div>

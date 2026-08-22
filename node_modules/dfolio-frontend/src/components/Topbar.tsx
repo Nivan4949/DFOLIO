@@ -1,19 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import client from '../api/client';
 import { 
-  Bell, 
+  Bell,
   Search, 
   Moon, 
-  Sparkles, 
-  Building2, 
-  CheckSquare, 
-  AlertTriangle, 
-  Home, 
-  FolderKanban, 
-  Camera, 
-  Loader2, 
+  Sun, 
+  Building2,
   X,
-  ExternalLink
+  CheckSquare,
+  AlertTriangle,
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 
 interface TopbarProps {
@@ -35,9 +32,9 @@ interface SearchResults {
 const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrentTab }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
-    { id: 1, text: 'New Daily Report submitted for Block C', time: '10m ago', read: false },
-    { id: 2, text: 'Snag #104 status updated to RESOLVED', time: '1h ago', read: false },
-    { id: 3, text: 'Safety audit scheduled for tomorrow 09:00 AM', time: '4h ago', read: true },
+    { id: 1, text: 'New Daily Site Report submitted for Residence Project', time: '10m ago', read: false },
+    { id: 2, text: 'Snag #104 resolved by Site Engineer', time: '1h ago', read: false },
+    { id: 3, text: 'Architectural structural inspection scheduled', time: '4h ago', read: true },
   ]);
 
   // Global Search State
@@ -47,7 +44,6 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
   const [showSearchPopover, setShowSearchPopover] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAllAsRead = () => {
@@ -97,20 +93,22 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
     setSearchQuery('');
   };
 
-  const getBreadcrumb = () => {
+  const getPageTitle = () => {
     switch (currentTab) {
-      case 'dashboard': return 'Dashboard Overview';
-      case 'projects': return 'Project Portfolios';
-      case 'rooms': return 'Room Management';
-      case 'categories': return 'Work Categories';
-      case 'subworks': return 'Sub Works Breakdown';
-      case 'tasks': return 'Execution Schedule';
-      case 'timeline': return 'Execution Timeline';
-      case 'snags': return 'Defect & Snag Tracker';
-      case 'reports': return 'Executive Reports';
-      case 'users': return 'User & Access Management';
-      case 'settings': return 'System Settings';
-      default: return 'Construction Portal';
+      case 'dashboard': return 'Overview';
+      case 'projects': return 'Projects';
+      case 'rooms': return 'Rooms';
+      case 'categories': return 'Categories';
+      case 'subworks': return 'Sub Works';
+      case 'tasks': return 'Works';
+      case 'timeline': return 'Timeline';
+      case 'snags': return 'Snags';
+      case 'reports': return 'Reports';
+      case 'photos': return 'Photos';
+      case 'users': return 'Team';
+      case 'contractor': return 'Contractors';
+      case 'settings': return 'Settings';
+      default: return 'Project Control';
     }
   };
 
@@ -124,24 +122,28 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
     : 0;
 
   return (
-    <header className="glass-panel sticky top-0 z-40 border-b border-white/5 py-4 px-6 md:px-8 flex justify-between items-center h-20">
-      {/* Breadcrumbs */}
+    <header className="bg-white/80 dark:bg-[#18191D]/80 backdrop-blur-md sticky top-0 z-30 border-b border-[#E8E5DF] dark:border-[#2B2D34] py-4 px-6 md:px-8 flex justify-between items-center h-20 transition-colors">
+      {/* Left Breadcrumb & Section Title */}
       <div>
-        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Portal</div>
-        <div className="text-base font-extrabold text-white tracking-wide mt-1">{getBreadcrumb()}</div>
+        <div className="text-[9px] font-medium text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-[0.2em]">
+          Control Panel &nbsp;/&nbsp; {getPageTitle()}
+        </div>
+        <h1 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED] tracking-tight mt-0.5">
+          {getPageTitle()}
+        </h1>
       </div>
 
-      {/* Action Items */}
+      {/* Center / Right Control Actions */}
       <div className="flex items-center gap-4">
         
-        {/* GLOBAL SEARCH INPUT WITH LIVE POPOVER */}
+        {/* Minimal Search Bar */}
         <div ref={searchRef} className="relative hidden md:block">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8C8F99] dark:text-[#7A7E88]" />
             <input 
               type="text"
-              placeholder="Global Search (Projects, Tasks, Snags, Rooms...)"
-              className="pl-9 pr-8 py-2 w-72 rounded-xl glass-input text-xs text-white"
+              placeholder="Search projects, works, snags..."
+              className="pl-8 pr-8 py-2 w-64 md:w-80 bg-[#FAF8F5] dark:bg-[#121316] border border-[#E0DCD4] dark:border-[#2E3038] text-xs text-[#16171A] dark:text-[#F4F2ED] placeholder-[#A0A4AD] focus:outline-none focus:border-[#16171A] dark:focus:border-[#F4F2ED] transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => {
@@ -149,158 +151,91 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
               }}
             />
             {searching ? (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-400 animate-spin" />
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#16171A] dark:text-[#F4F2ED] animate-spin" />
             ) : searchQuery ? (
               <button 
                 onClick={() => { setSearchQuery(''); setShowSearchPopover(false); }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-white"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-[#8C8F99] hover:text-[#16171A]"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             ) : null}
           </div>
 
-          {/* GLOBAL SEARCH RESULTS POPOVER */}
+          {/* Search Popover */}
           {showSearchPopover && searchResults && (
-            <div className="absolute right-0 mt-3 w-96 glass-panel rounded-2xl p-4 shadow-2xl border border-white/10 max-h-[480px] overflow-y-auto z-50 space-y-4">
-              <div className="flex justify-between items-center pb-2 border-b border-white/5 text-xs font-bold text-slate-400">
-                <span>Global Search Results ({totalMatchCount} matches)</span>
-                <span className="text-[10px] text-brand-400">Query: "{searchQuery}"</span>
+            <div className="absolute right-0 mt-3 w-96 bg-white dark:bg-[#1C1D23] border border-[#E8E5DF] dark:border-[#2B2D34] shadow-arch dark:shadow-arch-dark p-4 max-h-[480px] overflow-y-auto z-50 space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-[#E8E5DF] dark:border-[#2B2D34] text-xs font-medium text-[#6E7179] dark:text-[#A0A4AD]">
+                <span>Results ({totalMatchCount})</span>
+                <span className="text-[10px] text-[#16171A] dark:text-[#F4F2ED]">"{searchQuery}"</span>
               </div>
 
               {totalMatchCount === 0 ? (
-                <div className="p-4 text-center text-xs text-slate-500 italic">
-                  No matching items found across Projects, Tasks, Snags, Rooms, Categories, or Photos.
+                <div className="p-4 text-center text-xs text-[#8C8F99] italic">
+                  No items match query.
                 </div>
               ) : (
                 <div className="space-y-4 text-xs">
-                  {/* PROJECTS RESULTS */}
                   {searchResults.projects.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-[10px] font-extrabold text-brand-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <div className="text-[10px] font-semibold text-[#16171A] dark:text-[#F4F2ED] uppercase tracking-wider flex items-center gap-1.5">
                         <Building2 className="w-3.5 h-3.5" /> Projects ({searchResults.projects.length})
                       </div>
                       {searchResults.projects.map(p => (
                         <div
                           key={p.id}
                           onClick={() => handleNavigateToTab('projects')}
-                          className="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-white/5 cursor-pointer flex justify-between items-center transition-all"
+                          className="p-2.5 bg-[#FAF8F5] dark:bg-[#121316] hover:bg-[#EFECE6] dark:hover:bg-[#22242C] border border-[#E8E5DF] dark:border-[#2B2D34] cursor-pointer flex justify-between items-center transition-all"
                         >
                           <div>
-                            <div className="font-bold text-white">{p.name}</div>
-                            {p.location && <div className="text-[10px] text-slate-400">{p.location}</div>}
+                            <div className="font-semibold text-[#16171A] dark:text-[#F4F2ED]">{p.name}</div>
+                            {p.location && <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD]">{p.location}</div>}
                           </div>
-                          <ExternalLink className="w-3 h-3 text-slate-500" />
+                          <ExternalLink className="w-3 h-3 text-[#8C8F99]" />
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* TASKS RESULTS */}
                   {searchResults.tasks.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-[10px] font-extrabold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <CheckSquare className="w-3.5 h-3.5" /> Tasks ({searchResults.tasks.length})
+                      <div className="text-[10px] font-semibold text-[#16171A] dark:text-[#F4F2ED] uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckSquare className="w-3.5 h-3.5" /> Works ({searchResults.tasks.length})
                       </div>
                       {searchResults.tasks.map(t => (
                         <div
                           key={t.id}
                           onClick={() => handleNavigateToTab('tasks')}
-                          className="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-white/5 cursor-pointer flex justify-between items-center transition-all"
+                          className="p-2.5 bg-[#FAF8F5] dark:bg-[#121316] hover:bg-[#EFECE6] dark:hover:bg-[#22242C] border border-[#E8E5DF] dark:border-[#2B2D34] cursor-pointer flex justify-between items-center transition-all"
                         >
                           <div>
-                            <div className="font-bold text-white">{t.title || t.name}</div>
-                            <div className="text-[10px] text-slate-400">Status: {t.status} ({t.progress}%)</div>
+                            <div className="font-semibold text-[#16171A] dark:text-[#F4F2ED]">{t.title || t.name}</div>
+                            <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD]">Status: {t.status} ({t.progress}%)</div>
                           </div>
-                          <ExternalLink className="w-3 h-3 text-slate-500" />
+                          <ExternalLink className="w-3 h-3 text-[#8C8F99]" />
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* SNAGS RESULTS */}
                   {searchResults.snags.length > 0 && (
                     <div className="space-y-1.5">
-                      <div className="text-[10px] font-extrabold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <div className="text-[10px] font-semibold text-[#16171A] dark:text-[#F4F2ED] uppercase tracking-wider flex items-center gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5" /> Snags ({searchResults.snags.length})
                       </div>
                       {searchResults.snags.map(s => (
                         <div
                           key={s.id}
                           onClick={() => handleNavigateToTab('snags')}
-                          className="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-white/5 cursor-pointer flex justify-between items-center transition-all"
+                          className="p-2.5 bg-[#FAF8F5] dark:bg-[#121316] hover:bg-[#EFECE6] dark:hover:bg-[#22242C] border border-[#E8E5DF] dark:border-[#2B2D34] cursor-pointer flex justify-between items-center transition-all"
                         >
                           <div>
-                            <div className="font-bold text-white">{s.title}</div>
-                            <div className="text-[10px] text-red-400 font-semibold">{s.priority} • {s.status}</div>
+                            <div className="font-semibold text-[#16171A] dark:text-[#F4F2ED]">{s.title}</div>
+                            <div className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">{s.priority} • {s.status}</div>
                           </div>
-                          <ExternalLink className="w-3 h-3 text-slate-500" />
+                          <ExternalLink className="w-3 h-3 text-[#8C8F99]" />
                         </div>
                       ))}
-                    </div>
-                  )}
-
-                  {/* ROOMS RESULTS */}
-                  {searchResults.rooms.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Home className="w-3.5 h-3.5" /> Rooms ({searchResults.rooms.length})
-                      </div>
-                      {searchResults.rooms.map(r => (
-                        <div
-                          key={r.id}
-                          onClick={() => handleNavigateToTab('rooms')}
-                          className="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-white/5 cursor-pointer flex justify-between items-center transition-all"
-                        >
-                          <div>
-                            <div className="font-bold text-white">{r.name}</div>
-                            <div className="text-[10px] text-slate-400">{r.floor?.name}</div>
-                          </div>
-                          <ExternalLink className="w-3 h-3 text-slate-500" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* CATEGORIES RESULTS */}
-                  {searchResults.categories.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] font-extrabold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <FolderKanban className="w-3.5 h-3.5" /> Work Categories ({searchResults.categories.length})
-                      </div>
-                      {searchResults.categories.map(c => (
-                        <div
-                          key={c.id}
-                          onClick={() => handleNavigateToTab('categories')}
-                          className="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-white/5 cursor-pointer flex justify-between items-center transition-all"
-                        >
-                          <div>
-                            <div className="font-bold text-white">{c.name}</div>
-                            {c.description && <div className="text-[10px] text-slate-400 truncate">{c.description}</div>}
-                          </div>
-                          <ExternalLink className="w-3 h-3 text-slate-500" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* PHOTOS RESULTS */}
-                  {searchResults.photos.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-[10px] font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Camera className="w-3.5 h-3.5" /> Photos ({searchResults.photos.length})
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {searchResults.photos.map(ph => (
-                          <div
-                            key={ph.id}
-                            onClick={() => handleNavigateToTab('tasks')}
-                            className="relative aspect-video rounded-lg overflow-hidden border border-white/10 cursor-pointer group"
-                          >
-                            <img src={ph.url} alt={ph.caption || 'Photo'} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -309,72 +244,67 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
           )}
         </div>
 
-        {/* Theme Customizer Toggle */}
+        {/* Theme Toggle (Light / Dark Architectural) */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'midnight' : 'dark')}
-          className="p-2.5 hover:bg-white/5 border border-transparent hover:border-white/5 rounded-xl text-slate-400 hover:text-white transition-all flex items-center gap-1.5"
-          title="Toggle Theme style"
+          className="p-2 hover:bg-[#FAF8F5] dark:hover:bg-[#23252C] border border-[#E8E5DF] dark:border-[#2B2D34] text-[#16171A] dark:text-[#F4F2ED] transition-colors flex items-center gap-2"
+          title="Switch Dark / Light Theme"
         >
           {theme === 'dark' ? (
-            <>
-              <Moon className="w-4.5 h-4.5 text-brand-400" />
-              <span className="text-[10px] font-bold uppercase tracking-wider hidden lg:inline">Sleek Dark</span>
-            </>
+            <Sun className="w-4 h-4 text-[#C5A880]" />
           ) : (
-            <>
-              <Sparkles className="w-4.5 h-4.5 text-emerald-400" />
-              <span className="text-[10px] font-bold uppercase tracking-wider hidden lg:inline">Midnight Blue</span>
-            </>
+            <Moon className="w-4 h-4 text-[#16171A]" />
           )}
         </button>
 
-        {/* Notification Bell with Dropdown */}
+        {/* Notification Bell */}
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2.5 hover:bg-white/5 border border-transparent hover:border-white/5 rounded-xl text-slate-400 hover:text-white transition-all relative"
+            className="p-2 hover:bg-[#FAF8F5] dark:hover:bg-[#23252C] border border-[#E8E5DF] dark:border-[#2B2D34] text-[#16171A] dark:text-[#F4F2ED] transition-colors relative"
           >
-            <Bell className="w-4.5 h-4.5" />
+            <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full shadow-[0_0_8px_#0ea0ea]" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-rose-600 rounded-full" />
             )}
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-3 w-80 glass-panel rounded-2xl p-4 shadow-2xl border border-white/10 z-50">
-              <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/5">
-                <span className="text-xs font-black text-white uppercase tracking-wider">Notifications</span>
+            <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-[#1C1D23] border border-[#E8E5DF] dark:border-[#2B2D34] p-4 shadow-arch dark:shadow-arch-dark z-50">
+              <div className="flex justify-between items-center mb-3 pb-2 border-b border-[#E8E5DF] dark:border-[#2B2D34]">
+                <span className="text-xs font-semibold text-[#16171A] dark:text-[#F4F2ED] uppercase tracking-wider">Notifications</span>
                 {unreadCount > 0 && (
                   <button 
                     onClick={markAllAsRead}
-                    className="text-[10px] text-brand-400 hover:text-brand-300 font-bold uppercase"
+                    className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD] hover:underline font-medium"
                   >
-                    Mark read
+                    Mark all read
                   </button>
                 )}
               </div>
               
-              <div className="space-y-2.5 max-h-60 overflow-y-auto">
+              <div className="space-y-2 max-h-60 overflow-y-auto">
                 {notifications.map(n => (
                   <div 
                     key={n.id} 
-                    className={`p-2.5 rounded-xl border text-[11px] leading-relaxed transition-all ${
+                    className={`p-2.5 border text-xs leading-relaxed transition-all ${
                       n.read 
-                        ? 'bg-transparent border-transparent text-slate-400' 
-                        : 'bg-brand-500/5 border-brand-500/10 text-slate-200'
+                        ? 'bg-transparent border-transparent text-[#6E7179] dark:text-[#A0A4AD]' 
+                        : 'bg-[#FAF8F5] dark:bg-[#121316] border-[#E8E5DF] dark:border-[#2B2D34] text-[#16171A] dark:text-[#F4F2ED]'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-1">
                       <p>{n.text}</p>
-                      {!n.read && <span className="w-1.5 h-1.5 bg-brand-400 rounded-full flex-shrink-0 mt-1" />}
+                      {!n.read && <span className="w-1.5 h-1.5 bg-[#16171A] dark:bg-[#F4F2ED] rounded-full flex-shrink-0 mt-1" />}
                     </div>
-                    <span className="text-[9px] text-slate-500 block mt-1">{n.time}</span>
+                    <span className="text-[9px] text-[#A0A4AD] block mt-1">{n.time}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
         </div>
+
       </div>
     </header>
   );

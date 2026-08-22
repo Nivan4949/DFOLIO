@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import client from '../api/client';
-import { 
-  Calendar, 
-  AlertTriangle, 
-  CheckCircle2, 
-  GitCommit, 
-  Loader2, 
-  FolderKanban,
-  Edit3,
-  X
-} from 'lucide-react';
+import { Calendar, Loader2 } from 'lucide-react';
 
 interface TaskDependency {
   id: string;
@@ -42,11 +33,7 @@ const Timeline: React.FC = () => {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Editing Dependency Modal State
-  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
-  const [selectedDependencyId, setSelectedDependencyId] = useState<string>('');
-  const [submittingDep, setSubmittingDep] = useState(false);
+  const [hoveredTask, setHoveredTask] = useState<TaskItem | null>(null);
 
   const fetchTimelineTasks = async () => {
     try {
@@ -66,284 +53,158 @@ const Timeline: React.FC = () => {
     fetchTimelineTasks();
   }, []);
 
-  // Delay Calculation Helper
-  const calculateDelayInfo = (task: TaskItem) => {
-    if (task.status === 'COMPLETED' || task.progress >= 100) {
-      return { isDelayed: false, delayDays: 0 };
+  // Generate 14 day dates for Gantt header starting from earliest task or today
+  const getGanttDates = () => {
+    const dates = [];
+    const base = new Date();
+    base.setDate(base.getDate() - 3); // Start 3 days ago for context
+    for (let i = 0; i < 18; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() + i);
+      dates.push(d);
     }
-
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endDate = new Date(task.endDate);
-
-    if (task.status === 'HOLD') {
-      const diffMs = todayStart.getTime() - endDate.getTime();
-      const delayDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-      return { isDelayed: true, delayDays, reason: 'Task On Hold' };
-    }
-
-    if (endDate < todayStart) {
-      const diffMs = todayStart.getTime() - endDate.getTime();
-      const delayDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-      return { isDelayed: true, delayDays, reason: 'Overdue Deadline' };
-    }
-
-    return { isDelayed: false, delayDays: 0 };
+    return dates;
   };
 
-  const handleOpenDependencyModal = (task: TaskItem) => {
-    setEditingTask(task);
-    setSelectedDependencyId(task.dependsOnTaskId || '');
-  };
-
-  const handleSaveDependency = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingTask) return;
-
-    setSubmittingDep(true);
-    try {
-      await client.put(`/api/tasks/${editingTask.id}`, {
-        dependsOnTaskId: selectedDependencyId || null,
-      });
-      setEditingTask(null);
-      fetchTimelineTasks();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update task dependency');
-    } finally {
-      setSubmittingDep(false);
-    }
-  };
-
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'NOT_STARTED':
-        return { label: 'Not Started', badge: 'bg-slate-800 text-slate-400 border-slate-700', barBg: 'bg-slate-700' };
-      case 'IN_PROGRESS':
-        return { label: 'In Progress', badge: 'bg-brand-500/10 text-brand-400 border-brand-500/20', barBg: 'bg-brand-500' };
-      case 'HOLD':
-        return { label: 'Hold', badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20', barBg: 'bg-amber-500' };
-      case 'INSPECTION':
-        return { label: 'Inspection', badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20', barBg: 'bg-purple-500' };
-      case 'COMPLETED':
-        return { label: 'Completed', badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', barBg: 'bg-emerald-500' };
-      default:
-        return { label: status, badge: 'bg-slate-800 text-slate-400 border-slate-700', barBg: 'bg-brand-500' };
-    }
-  };
+  const ganttDates = getGanttDates();
+  const todayStr = new Date().toDateString();
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-10 animate-fade-in">
+      
       {/* HEADER */}
-      <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-6">
         <div>
-          <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-cyan-400" />
-            Construction Execution Timeline & Dependencies
-          </h3>
-          <p className="text-xs text-slate-400">
-            Interactive Gantt schedule, Task Dependencies, Start & End Dates, Delay Calculations, and Progress bars.
+          <div className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#6E7179] dark:text-[#A0A4AD]">
+            CRITICAL PATH & SCHEDULE
+          </div>
+          <h2 className="font-serif text-3xl font-bold text-[#16171A] dark:text-[#F4F2ED] tracking-tight mt-1">
+            Execution Timeline
+          </h2>
+          <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1 max-w-xl">
+            Architectural Gantt schedule mapping trade sequences, work overlaps, and prerequisite dependency chains.
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 bg-red-950/40 border border-red-500/30 text-red-200 text-sm rounded-xl flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-sm">
           {error}
         </div>
       )}
 
-      {/* TIMELINE LIST */}
       {loading ? (
-        <div className="glass-card p-12 text-center rounded-2xl">
-          <Loader2 className="w-8 h-8 text-cyan-500 animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Connecting to PostgreSQL Database...</p>
+        <div className="arch-card p-16 text-center">
+          <Loader2 className="w-8 h-8 text-[#16171A] dark:text-[#F4F2ED] animate-spin mx-auto mb-3" />
+          <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD]">Loading Schedule Grid...</p>
         </div>
       ) : tasks.length === 0 ? (
-        <div className="glass-card p-12 text-center rounded-2xl">
-          <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-300 text-sm font-semibold">No Execution Tasks Found</p>
-          <p className="text-slate-500 text-xs mt-1">Create tasks to view the timeline Gantt chart and dependency chain.</p>
+        <div className="arch-card p-16 text-center">
+          <Calendar className="w-12 h-12 text-[#8C8F99] mx-auto mb-3" />
+          <h3 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED]">No Tasks Scheduled</h3>
+          <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1">Create tasks to view Gantt timeline bars.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {tasks.map((task) => {
-            const delayInfo = calculateDelayInfo(task);
-            const statusConfig = getStatusConfig(task.status);
-
-            const startDateStr = new Date(task.startDate).toLocaleDateString();
-            const endDateStr = new Date(task.endDate).toLocaleDateString();
-            const estDays = task.estimatedDays || Math.max(1, Math.ceil((new Date(task.endDate).getTime() - new Date(task.startDate).getTime()) / 86400000));
-
-            const hasDependency = !!task.dependsOnTask;
-            const isPrereqUnfinished = hasDependency && task.dependsOnTask?.status !== 'COMPLETED';
-
-            return (
-              <div key={task.id} className="glass-card p-5 rounded-2xl space-y-4 relative group">
+        <div className="space-y-8">
+          
+          {/* 🏛️ DESKTOP HORIZONTAL GANTT TIMELINE */}
+          <div className="hidden md:block arch-card p-6 overflow-hidden">
+            <div className="overflow-x-auto pb-4">
+              <div className="min-w-[900px]">
                 
-                {/* TOP BAR: Task Name, Dates & Delay Calculation Badge */}
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold">
-                      {task.subWork?.category && (
-                        <span className="flex items-center gap-1 text-cyan-400 font-extrabold uppercase tracking-widest bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                          <FolderKanban className="w-3 h-3" />
-                          {task.subWork.category.name}
-                        </span>
-                      )}
-
-                      {task.room && (
-                        <span className="text-slate-400 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                          {task.room.name}
-                        </span>
-                      )}
-                    </div>
-
-                    <h4 className="text-base font-extrabold text-white leading-tight">
-                      {task.title || task.name}
-                    </h4>
+                {/* Gantt Header Days */}
+                <div className="grid grid-cols-[220px_1fr] border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-3 mb-4">
+                  <div className="text-[10px] font-mono uppercase text-[#6E7179] dark:text-[#A0A4AD] font-semibold">
+                    Work Phase / Task
                   </div>
-
-                  {/* DATES & DELAY CALCULATION */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-900 rounded-xl border border-white/5 text-slate-300">
-                      <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>{startDateStr} → {endDateStr}</span>
-                      <span className="text-[10px] font-bold text-slate-500">({estDays} Days)</span>
-                    </div>
-
-                    {/* DELAY CALCULATION BADGE */}
-                    {delayInfo.isDelayed ? (
-                      <div className="flex items-center gap-1 px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-300 font-extrabold text-xs rounded-xl shadow-sm animate-pulse">
-                        <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                        <span>Delayed by {delayInfo.delayDays} Days</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs rounded-xl">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>On Schedule</span>
-                      </div>
-                    )}
+                  <div className="grid grid-cols-18 gap-1 text-center font-mono text-[9px]">
+                    {ganttDates.map((d, idx) => {
+                      const isToday = d.toDateString() === todayStr;
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`p-1 ${isToday ? 'bg-[#16171A] text-[#FAF8F5] dark:bg-[#F4F2ED] dark:text-[#16171A] font-bold' : 'text-[#6E7179]'}`}
+                        >
+                          <div>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                          <div className="font-bold">{d.getDate()}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* VISUAL GANTT PROGRESS BAR */}
-                <div className="space-y-1.5 bg-slate-950/60 p-3.5 rounded-xl border border-white/5">
-                  <div className="flex justify-between items-center text-xs font-bold">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] border px-2 py-0.5 rounded uppercase tracking-wider font-extrabold ${statusConfig.badge}`}>
-                        {statusConfig.label}
-                      </span>
-                      <span className="text-slate-400 text-[11px]">Execution Progress</span>
-                    </div>
-                    <span className="text-white font-black text-sm">{task.progress}%</span>
-                  </div>
+                {/* Task Bars */}
+                <div className="space-y-4">
+                  {tasks.map((task) => {
+                    return (
+                      <div 
+                        key={task.id} 
+                        className="grid grid-cols-[220px_1fr] items-center group py-2 border-b border-[#E8E5DF]/40 dark:border-[#2B2D34]/40"
+                        onMouseEnter={() => setHoveredTask(task)}
+                        onMouseLeave={() => setHoveredTask(null)}
+                      >
+                        {/* Left Title */}
+                        <div className="pr-4">
+                          <div className="font-serif font-bold text-sm text-[#16171A] dark:text-[#F4F2ED] truncate">
+                            {task.title || task.name}
+                          </div>
+                          <div className="text-[10px] text-[#6E7179] dark:text-[#A0A4AD] font-mono">
+                            {task.subWork?.category?.name || 'Trade Work'}
+                          </div>
+                        </div>
 
-                  <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-white/10 relative">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${statusConfig.barBg}`}
-                      style={{ width: `${Math.max(3, task.progress)}%` }}
-                    />
-                  </div>
-                </div>
+                        {/* Gantt Bar Line */}
+                        <div className="relative h-8 bg-[#FAF8F5] dark:bg-[#121316] rounded-sm flex items-center p-1 border border-[#E8E5DF] dark:border-[#2B2D34]">
+                          <div 
+                            className="h-full bg-[#16171A] dark:bg-[#F4F2ED] rounded-xs transition-all flex items-center justify-between px-2 text-[9px] font-mono text-[#FAF8F5] dark:text-[#16171A] relative"
+                            style={{
+                              width: `${Math.max(15, task.progress)}%`,
+                            }}
+                          >
+                            <span className="font-bold">{task.progress}%</span>
+                            <span className="truncate max-w-[80px] hidden sm:inline">{task.status}</span>
+                          </div>
 
-                {/* TASK DEPENDENCIES DISPLAY */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-white/5">
-                  <div className="flex items-center gap-2">
-                    <GitCommit className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs font-bold text-slate-400">Prerequisite Dependency:</span>
-                    
-                    {hasDependency ? (
-                      <span className={`text-xs font-extrabold px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${
-                        isPrereqUnfinished 
-                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
-                      }`}>
-                        <span>{task.dependsOnTask?.title || task.dependsOnTask?.name}</span>
-                        <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-black/40">
-                          {task.dependsOnTask?.status} ({task.dependsOnTask?.progress}%)
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-500 italic">None (Independent Task)</span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenDependencyModal(task)}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all border border-slate-700"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Set Dependency</span>
-                  </button>
+                          {/* Hover Tooltip */}
+                          {hoveredTask?.id === task.id && (
+                            <div className="absolute left-1/2 -top-12 -translate-x-1/2 bg-[#16171A] text-[#FAF8F5] dark:bg-[#F4F2ED] dark:text-[#16171A] text-[10px] font-mono p-2 shadow-2xl z-30 pointer-events-none whitespace-nowrap">
+                              {task.title || task.name} ({task.progress}%) | {new Date(task.startDate).toLocaleDateString()} - {new Date(task.endDate).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* EDIT DEPENDENCY MODAL */}
-      {editingTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-md glass-panel p-6 rounded-2xl shadow-2xl relative space-y-5">
-            <button
-              onClick={() => setEditingTask(null)}
-              className="absolute right-4 top-4 p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <GitCommit className="w-5 h-5 text-purple-400" />
-                Configure Task Dependency
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Select the prerequisite task that must be completed before <strong className="text-white">{editingTask.title || editingTask.name}</strong> can start.
-              </p>
             </div>
-
-            <form onSubmit={handleSaveDependency} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Prerequisite Predecessor Task
-                </label>
-                <select
-                  className="w-full px-4 py-2.5 rounded-xl glass-input text-xs cursor-pointer bg-slate-900 font-semibold"
-                  value={selectedDependencyId}
-                  onChange={(e) => setSelectedDependencyId(e.target.value)}
-                >
-                  <option value="">-- No Dependency (Start Immediately) --</option>
-                  {tasks
-                    .filter(t => t.id !== editingTask.id)
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title || t.name} ({t.status} - {t.progress}%)
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingTask(null)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingDep}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition-all disabled:opacity-50"
-                >
-                  {submittingDep ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Dependency'}
-                </button>
-              </div>
-            </form>
           </div>
+
+          {/* 📱 MOBILE VERTICAL TIMELINE LIST */}
+          <div className="md:hidden space-y-4">
+            {tasks.map((task) => (
+              <div key={task.id} className="arch-card p-5 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[9px] font-mono uppercase text-[#6E7179]">{task.subWork?.category?.name || 'Phase'}</span>
+                    <h4 className="font-serif font-bold text-base text-[#16171A] dark:text-[#F4F2ED]">{task.title || task.name}</h4>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold">{task.progress}%</span>
+                </div>
+
+                <div className="w-full h-1.5 bg-[#E8E5DF] dark:bg-[#2B2D34]">
+                  <div className="h-full bg-[#16171A] dark:bg-[#F4F2ED]" style={{ width: `${task.progress}%` }} />
+                </div>
+
+                <div className="flex justify-between text-[10px] font-mono text-[#6E7179]">
+                  <span>Start: {new Date(task.startDate).toLocaleDateString()}</span>
+                  <span>End: {new Date(task.endDate).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
         </div>
       )}
     </div>

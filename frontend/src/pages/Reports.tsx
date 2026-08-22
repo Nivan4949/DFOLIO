@@ -3,24 +3,32 @@ import client from '../api/client';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { 
-  FileSpreadsheet, 
   Download, 
   Calendar, 
   Clock, 
   AlertTriangle, 
   CheckCircle2, 
-  HardHat, 
   Loader2, 
-  Building2, 
-  FileText,
-  Printer
+  Printer,
+  Camera,
+  X
 } from 'lucide-react';
 
-export type ReportType = 'daily' | 'weekly' | 'snag' | 'completion';
+export type ReportType = 'daily' | 'weekly' | 'snag' | 'completion' | 'gallery';
+
+interface PhotoItem {
+  id: string;
+  url: string;
+  caption?: string | null;
+  createdAt: string;
+  task?: { name: string; room?: { name: string; floor?: { name: string } } };
+}
 
 const Reports: React.FC = () => {
   const [activeType, setActiveType] = useState<ReportType>('daily');
   const [reportData, setReportData] = useState<any>(null);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -31,10 +39,15 @@ const Reports: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      const res = await client.get(`/api/reports/${type}`);
-      setReportData(res.data);
+      if (type === 'gallery') {
+        const res = await client.get('/api/photos');
+        setPhotos(res.data);
+      } else {
+        const res = await client.get(`/api/reports/${type}`);
+        setReportData(res.data);
+      }
     } catch (err: any) {
-      console.error('Failed to fetch report data:', err);
+      console.error('Failed to fetch data:', err);
       setError(err.response?.data?.error || 'Failed to generate report dataset from database.');
     } finally {
       setLoading(false);
@@ -54,7 +67,7 @@ const Reports: React.FC = () => {
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
-        backgroundColor: '#060814',
+        backgroundColor: '#FAF8F5',
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -71,7 +84,6 @@ const Reports: React.FC = () => {
       pdf.save(`DFOLIO_${activeType.toUpperCase()}_REPORT_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err: any) {
       console.error('PDF Export Error:', err);
-      // Fallback: Trigger native browser print engine
       window.print();
     } finally {
       setExportingPdf(false);
@@ -79,69 +91,62 @@ const Reports: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-10 animate-fade-in">
       
-      {/* HEADER & CONTROLS */}
-      <div className="glass-panel p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-6">
         <div>
-          <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-            Executive Construction Reports & PDF Export
-          </h3>
-          <p className="text-xs text-slate-400">
-            Generate and export PDF reports for Daily Site Logs, Weekly Summaries, Snags, and Project Handover.
+          <div className="text-[9px] font-semibold uppercase tracking-[0.25em] text-[#6E7179] dark:text-[#A0A4AD]">
+            PROJECT DOCUMENTATION & EXPORTS
+          </div>
+          <h2 className="font-serif text-3xl font-bold text-[#16171A] dark:text-[#F4F2ED] tracking-tight mt-1">
+            Executive Reports & Photo Gallery
+          </h2>
+          <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1 max-w-xl">
+            Generate printable PDF executive documentation or inspect site photo logs.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.print()}
-            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all border border-slate-700"
-            title="Print Report"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print</span>
-          </button>
+        {activeType !== 'gallery' && (
+          <div className="flex items-center gap-3">
+            <button onClick={() => window.print()} className="arch-btn-secondary flex items-center gap-2">
+              <Printer className="w-3.5 h-3.5" /> Print
+            </button>
 
-          <button
-            onClick={handleExportPDF}
-            disabled={exportingPdf || loading || !reportData}
-            className="flex items-center justify-center gap-2 py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(16,185,129,0.25)] disabled:opacity-50"
-          >
-            {exportingPdf ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Exporting PDF...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" /> Export PDF
-              </>
-            )}
-          </button>
-        </div>
+            <button
+              onClick={handleExportPDF}
+              disabled={exportingPdf || loading || !reportData}
+              className="arch-btn-primary flex items-center gap-2 disabled:opacity-50"
+            >
+              {exportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              <span>Export PDF</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* REPORT TYPE TABS */}
-      <div className="glass-card p-2 rounded-2xl flex flex-wrap gap-2">
-        {([
-          { id: 'daily', label: 'Daily Progress Report', icon: Clock },
-          { id: 'weekly', label: 'Weekly Execution Report', icon: Calendar },
-          { id: 'snag', label: 'Snag & Defect Report', icon: AlertTriangle },
-          { id: 'completion', label: 'Handover & Completion Report', icon: CheckCircle2 },
-        ] as const).map((tab) => {
+      {/* NAVIGATION TABS */}
+      <div className="flex flex-wrap gap-2 border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-4">
+        {[
+          { id: 'daily', label: 'Daily Log', icon: Clock },
+          { id: 'weekly', label: 'Weekly Summary', icon: Calendar },
+          { id: 'snag', label: 'Defect Snags', icon: AlertTriangle },
+          { id: 'completion', label: 'Handover & Completion', icon: CheckCircle2 },
+          { id: 'gallery', label: 'Photo Gallery', icon: Camera },
+        ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeType === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveType(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+              onClick={() => setActiveType(tab.id as ReportType)}
+              className={`flex items-center gap-2 text-xs font-mono px-4 py-2 border transition-all ${
                 isActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-[#16171A] dark:bg-[#F4F2ED] text-[#FAF8F5] dark:text-[#16171A] border-[#16171A] dark:border-[#F4F2ED]'
+                  : 'bg-transparent border-[#E8E5DF] dark:border-[#2B2D34] text-[#6E7179] dark:text-[#A0A4AD] hover:border-[#16171A]'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
             </button>
           );
@@ -149,262 +154,148 @@ const Reports: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-950/40 border border-red-500/30 text-red-200 text-sm rounded-xl flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-sm">
           {error}
         </div>
       )}
 
-      {/* PREVIEW CONTAINER FOR PDF EXPORT */}
-      {loading ? (
-        <div className="glass-card p-16 text-center rounded-2xl">
-          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Generating Live Report Data...</p>
-        </div>
-      ) : !reportData ? (
-        <div className="glass-card p-12 text-center rounded-2xl">
-          <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-300 text-sm font-semibold">No Data Available</p>
-        </div>
-      ) : (
-        <div ref={reportRef} className="glass-panel p-8 rounded-2xl space-y-6 bg-[#060814] text-white border border-white/10 shadow-2xl">
-          
-          {/* REPORT HEADER BRANDING */}
-          <div className="flex justify-between items-start border-b border-white/10 pb-6">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center text-emerald-400 font-black text-sm">
-                  <HardHat className="w-4 h-4" />
+      {/* 📸 MASONRY PHOTO GALLERY MODE */}
+      {activeType === 'gallery' ? (
+        loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-64 arch-skeleton" />)}
+          </div>
+        ) : photos.length === 0 ? (
+          <div className="arch-card p-16 text-center">
+            <Camera className="w-12 h-12 text-[#8C8F99] mx-auto mb-3" />
+            <h3 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED]">No Site Photos</h3>
+            <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD] mt-1">Upload inspection photos inside work task panels.</p>
+          </div>
+        ) : (
+          <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+            {photos.map((photo) => (
+              <div 
+                key={photo.id}
+                onClick={() => setSelectedPhoto(photo)}
+                className="arch-card arch-image-card break-inside-avoid group cursor-pointer overflow-hidden relative"
+              >
+                <img src={photo.url} alt={photo.caption || 'Site photo'} loading="lazy" className="w-full object-cover" />
+                <div className="arch-image-overlay">
+                  <div className="space-y-1">
+                    <div className="text-[9px] font-mono text-white/70">
+                      {new Date(photo.createdAt).toLocaleDateString()}
+                    </div>
+                    <div className="font-serif text-base font-bold text-white leading-snug">
+                      {photo.caption || photo.task?.name || 'Inspection Log'}
+                    </div>
+                  </div>
                 </div>
-                <span className="text-lg font-black tracking-widest text-white">DFOLIO CONSTRUCTIONS</span>
               </div>
-              <h2 className="text-xl font-extrabold text-white pt-2">{reportData.title}</h2>
-              <p className="text-xs text-slate-400">Official Executive Report • Generated {new Date(reportData.generatedAt).toLocaleString()}</p>
-            </div>
-
-            <div className="text-right text-xs text-slate-400 font-semibold space-y-1">
-              <div className="text-white font-bold uppercase tracking-wider">DFOLIO SYSTEM</div>
-              <div>Report ID: #{activeType.toUpperCase()}-{Date.now().toString().slice(-6)}</div>
-              <div className="text-emerald-400 font-extrabold">STATUS: VERIFIED</div>
-            </div>
+            ))}
           </div>
+        )
+      ) : (
+        /* 📄 EDITORIAL PDF REPORT PREVIEW */
+        loading ? (
+          <div className="arch-card p-16 text-center">
+            <Loader2 className="w-8 h-8 text-[#16171A] dark:text-[#F4F2ED] animate-spin mx-auto mb-3" />
+            <p className="text-xs text-[#6E7179] dark:text-[#A0A4AD]">Compiling Executive Report...</p>
+          </div>
+        ) : reportData && (
+          <div ref={reportRef} className="arch-card p-10 space-y-8 bg-[#FAF8F5] dark:bg-[#121316] text-[#16171A] dark:text-[#F4F2ED]">
+            
+            {/* Header branding */}
+            <div className="flex justify-between items-start border-b border-[#E8E5DF] dark:border-[#2B2D34] pb-6">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-[#6E7179]">DFOLIO ARCHITECTURAL STUDIO</div>
+                <h1 className="font-serif text-3xl font-bold mt-1">{reportData.title}</h1>
+                <p className="text-xs text-[#6E7179] mt-0.5">Generated {new Date(reportData.generatedAt).toLocaleString()}</p>
+              </div>
 
-          {/* METRICS CARDS */}
-          {reportData.type === 'daily' && (
+              <div className="text-right text-xs font-mono space-y-1">
+                <div className="font-bold">VERIFIED REPORT</div>
+                <div className="text-[10px] text-[#6E7179]">ID: #{activeType.toUpperCase()}-{Date.now().toString().slice(-6)}</div>
+              </div>
+            </div>
+
+            {/* Metrics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Active Tasks Today</div>
-                <div className="text-2xl font-black text-white mt-1">{reportData.metrics.activeTasksCount}</div>
+              <div className="p-4 border border-[#E8E5DF] dark:border-[#2B2D34] bg-white dark:bg-[#18191D]">
+                <div className="text-[9px] font-mono uppercase text-[#6E7179]">Scope Metric</div>
+                <div className="font-serif text-2xl font-bold mt-1">
+                  {reportData.metrics?.activeTasksCount || reportData.metrics?.totalWeeklyTasks || reportData.metrics?.totalSnags || reportData.metrics?.totalTasks || 0}
+                </div>
               </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Total Workers On Site</div>
-                <div className="text-2xl font-black text-emerald-400 mt-1">{reportData.metrics.totalLaborOnSite}</div>
-              </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Site Notes Filed</div>
-                <div className="text-2xl font-black text-purple-400 mt-1">{reportData.metrics.notesCount}</div>
-              </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Photos Captured</div>
-                <div className="text-2xl font-black text-brand-400 mt-1">{reportData.metrics.photosCount}</div>
+
+              <div className="p-4 border border-[#E8E5DF] dark:border-[#2B2D34] bg-white dark:bg-[#18191D]">
+                <div className="text-[9px] font-mono uppercase text-[#6E7179]">Status Indicator</div>
+                <div className="font-serif text-2xl font-bold mt-1">
+                  {reportData.metrics?.avgProgressPercent || reportData.metrics?.overallProgressPercent || reportData.metrics?.open || 100}%
+                </div>
               </div>
             </div>
-          )}
 
-          {reportData.type === 'weekly' && (
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Total Weekly Tasks</div>
-                <div className="text-2xl font-black text-white mt-1">{reportData.metrics.totalWeeklyTasks}</div>
-              </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Avg Progress %</div>
-                <div className="text-2xl font-black text-emerald-400 mt-1">{reportData.metrics.avgProgressPercent}%</div>
-              </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Delayed Tasks</div>
-                <div className="text-2xl font-black text-red-400 mt-1">{reportData.metrics.delayedTasksCount}</div>
-              </div>
-            </div>
-          )}
-
-          {reportData.type === 'snag' && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Total Snags</div>
-                <div className="text-xl font-black text-white mt-1">{reportData.metrics.totalSnags}</div>
-              </div>
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-red-400 uppercase">Open</div>
-                <div className="text-xl font-black text-red-400 mt-1">{reportData.metrics.open}</div>
-              </div>
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-brand-400 uppercase">In Progress</div>
-                <div className="text-xl font-black text-brand-400 mt-1">{reportData.metrics.inProgress}</div>
-              </div>
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-amber-300 uppercase">Resolved</div>
-                <div className="text-xl font-black text-amber-300 mt-1">{reportData.metrics.resolved}</div>
-              </div>
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-emerald-400 uppercase">Closed</div>
-                <div className="text-xl font-black text-emerald-400 mt-1">{reportData.metrics.closed}</div>
-              </div>
-            </div>
-          )}
-
-          {reportData.type === 'completion' && (
-            <div className="grid grid-cols-4 gap-4">
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Overall Completion</div>
-                <div className="text-2xl font-black text-emerald-400 mt-1">{reportData.metrics.overallProgressPercent}%</div>
-              </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Total Tasks</div>
-                <div className="text-2xl font-black text-white mt-1">{reportData.metrics.totalTasks}</div>
-              </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Completed Tasks</div>
-                <div className="text-2xl font-black text-emerald-300 mt-1">{reportData.metrics.completedTasks}</div>
-              </div>
-              <div className="p-4 bg-slate-900/80 rounded-xl border border-white/5">
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Rooms Handled</div>
-                <div className="text-2xl font-black text-cyan-400 mt-1">{reportData.metrics.roomsCount}</div>
-              </div>
-            </div>
-          )}
-
-          {/* REPORT DATA TABLES */}
-          <div className="space-y-3 pt-2">
-            <h4 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-emerald-400" /> Executive Data Breakdown
-            </h4>
-
-            {reportData.type === 'daily' && (
+            {/* Table */}
+            <div className="pt-4 space-y-3">
+              <h3 className="font-serif text-lg font-bold">Executive Log Data</h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold">
-                    <tr>
-                      <th className="p-3">Task Title</th>
-                      <th className="p-3">Room / Floor</th>
-                      <th className="p-3">Trade / SubWork</th>
+                <table className="w-full text-left text-xs border border-[#E8E5DF] dark:border-[#2B2D34]">
+                  <thead>
+                    <tr className="bg-[#EFECE6] dark:bg-[#1C1D23] font-mono text-[9px] uppercase text-[#6E7179]">
+                      <th className="p-3">Item / Task</th>
+                      <th className="p-3">Location</th>
                       <th className="p-3">Status</th>
-                      <th className="p-3">Progress</th>
-                      <th className="p-3">Labour</th>
+                      <th className="p-3 text-right">Completion</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
-                    {reportData.tasks.map((t: any) => (
-                      <tr key={t.id}>
-                        <td className="p-3 font-bold text-white">{t.name || t.title}</td>
-                        <td className="p-3">{t.room?.name || 'Site'}</td>
-                        <td className="p-3">{t.subWork?.name || 'General'}</td>
-                        <td className="p-3 uppercase font-extrabold text-brand-400">{t.status}</td>
-                        <td className="p-3 font-bold">{t.progress}%</td>
-                        <td className="p-3">{t.labourCount || 1} Workers</td>
+                  <tbody className="divide-y divide-[#E8E5DF] dark:divide-[#2B2D34]">
+                    {(reportData.tasks || reportData.snags || reportData.rooms || []).slice(0, 10).map((row: any, i: number) => (
+                      <tr key={i}>
+                        <td className="p-3 font-semibold">{row.title || row.name}</td>
+                        <td className="p-3 text-[#6E7179]">{row.room?.name || row.floorName || 'Site'}</td>
+                        <td className="p-3 font-mono text-[10px] uppercase">{row.status || 'ACTIVE'}</td>
+                        <td className="p-3 text-right font-mono font-bold">{row.progress || 100}%</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
+            </div>
 
-            {reportData.type === 'weekly' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold">
-                    <tr>
-                      <th className="p-3">Task Title</th>
-                      <th className="p-3">Start Date</th>
-                      <th className="p-3">End Date</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Progress</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
-                    {reportData.tasks.map((t: any) => (
-                      <tr key={t.id}>
-                        <td className="p-3 font-bold text-white">{t.name || t.title}</td>
-                        <td className="p-3">{new Date(t.startDate).toLocaleDateString()}</td>
-                        <td className="p-3">{new Date(t.endDate).toLocaleDateString()}</td>
-                        <td className="p-3 uppercase font-extrabold text-cyan-400">{t.status}</td>
-                        <td className="p-3 font-bold">{t.progress}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Signature */}
+            <div className="pt-12 grid grid-cols-2 gap-8 border-t border-[#E8E5DF] dark:border-[#2B2D34] text-xs">
+              <div className="border-b border-[#16171A] dark:border-[#F4F2ED] pb-8 text-[#6E7179]">
+                Architectural Lead Signature
               </div>
-            )}
-
-            {reportData.type === 'snag' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold">
-                    <tr>
-                      <th className="p-3">Defect Title</th>
-                      <th className="p-3">Room</th>
-                      <th className="p-3">Priority</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Assigned Labour</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
-                    {reportData.snags.map((s: any) => (
-                      <tr key={s.id}>
-                        <td className="p-3 font-bold text-white">{s.title}</td>
-                        <td className="p-3">{s.room?.name || 'Site'}</td>
-                        <td className="p-3 uppercase font-bold text-orange-400">{s.priority}</td>
-                        <td className="p-3 uppercase font-extrabold text-red-400">{s.status}</td>
-                        <td className="p-3">{s.assignedTo?.name || 'Unassigned'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="border-b border-[#16171A] dark:border-[#F4F2ED] pb-8 text-[#6E7179]">
+                Site Engineer Approval
               </div>
-            )}
+            </div>
 
-            {reportData.type === 'completion' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold">
-                    <tr>
-                      <th className="p-3">Room Name</th>
-                      <th className="p-3">Floor</th>
-                      <th className="p-3">Tasks Count</th>
-                      <th className="p-3">Completion %</th>
-                      <th className="p-3">Pending Defect Snags</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-slate-300">
-                    {reportData.rooms.map((r: any) => (
-                      <tr key={r.id}>
-                        <td className="p-3 font-bold text-white">{r.name}</td>
-                        <td className="p-3">{r.floorName || 'General Floor'}</td>
-                        <td className="p-3">{r.taskCount} Tasks</td>
-                        <td className="p-3 font-bold text-emerald-400">{r.progress}%</td>
-                        <td className="p-3 text-red-400 font-bold">{r.pendingSnags} Snags</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          </div>
+        )
+      )}
+
+      {/* LIGHTBOX MODAL */}
+      {selectedPhoto && (
+        <div 
+          onClick={() => setSelectedPhoto(null)} 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-pointer"
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <img src={selectedPhoto.url} alt="Lightbox view" className="max-w-full max-h-[85vh] object-contain shadow-2xl" />
+            <div className="absolute top-4 right-4 text-white p-2">
+              <X className="w-6 h-6" />
+            </div>
+            {selectedPhoto.caption && (
+              <div className="absolute bottom-4 left-4 right-4 p-4 bg-black/80 text-white font-serif text-lg">
+                {selectedPhoto.caption}
               </div>
             )}
           </div>
-
-          {/* SIGNATURE & AUTHORIZATION BLOCK */}
-          <div className="pt-8 border-t border-white/10 grid grid-cols-2 gap-8 text-xs text-slate-400">
-            <div>
-              <div className="border-b border-slate-700 pb-8 text-slate-500 italic">Site Engineer Signature</div>
-              <div className="pt-2 font-bold text-white">Prepared By: Site Inspection Manager</div>
-            </div>
-            <div>
-              <div className="border-b border-slate-700 pb-8 text-slate-500 italic">Project Manager Approval</div>
-              <div className="pt-2 font-bold text-white">Approved By: Chief Construction Manager</div>
-            </div>
-          </div>
-
         </div>
       )}
+
     </div>
   );
 };
