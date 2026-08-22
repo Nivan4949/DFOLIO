@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deletePhoto = exports.getTaskPhotos = exports.uploadPhoto = void 0;
+exports.getAllPhotos = exports.deletePhoto = exports.getTaskPhotos = exports.uploadPhoto = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const supabase_1 = require("../config/supabase");
 const uploadPhoto = async (req, res) => {
@@ -132,3 +132,25 @@ const deletePhoto = async (req, res) => {
     }
 };
 exports.deletePhoto = deletePhoto;
+const getAllPhotos = async (req, res) => {
+    try {
+        const photos = await prisma_1.default.photo.findMany({
+            include: {
+                uploadedBy: { select: { id: true, name: true } },
+                task: {
+                    select: {
+                        name: true,
+                        title: true,
+                        room: { select: { name: true, floor: { select: { name: true } } } },
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json(photos);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to retrieve all photos' });
+    }
+};
+exports.getAllPhotos = getAllPhotos;

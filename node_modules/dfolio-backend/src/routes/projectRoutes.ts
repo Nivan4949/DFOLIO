@@ -11,8 +11,9 @@ import { authenticateJWT, authorizeRoles } from '../middleware/auth';
 
 const router = Router();
 
-// Retrieve dashboard stats (must be placed before GET /:id route)
+// Retrieve dashboard stats (support both /stats and /dashboard/stats)
 router.get('/stats', authenticateJWT, getDashboardStats);
+router.get('/dashboard/stats', authenticateJWT, getDashboardStats);
 
 router.post('/', authenticateJWT, authorizeRoles(['ADMIN', 'PROJECT_MANAGER']), createProject);
 router.get('/', authenticateJWT, getProjects);

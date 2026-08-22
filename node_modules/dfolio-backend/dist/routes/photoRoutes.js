@@ -12,6 +12,7 @@ const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
+router.get('/', auth_1.authenticateJWT, photoController_1.getAllPhotos);
 router.post('/upload', auth_1.authenticateJWT, upload.single('photo'), photoController_1.uploadPhoto);
 router.get('/task/:taskId', auth_1.authenticateJWT, photoController_1.getTaskPhotos);
 router.delete('/:id', auth_1.authenticateJWT, photoController_1.deletePhoto);

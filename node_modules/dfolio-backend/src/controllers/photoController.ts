@@ -136,3 +136,25 @@ export const deletePhoto = async (req: AuthenticatedRequest, res: Response) => {
     res.status(500).json({ error: error.message || 'Failed to delete photo' });
   }
 };
+
+export const getAllPhotos = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const photos = await prisma.photo.findMany({
+      include: {
+        uploadedBy: { select: { id: true, name: true } },
+        task: {
+          select: {
+            name: true,
+            title: true,
+            room: { select: { name: true, floor: { select: { name: true } } } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(photos);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to retrieve all photos' });
+  }
+};
