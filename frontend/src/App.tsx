@@ -20,8 +20,22 @@ const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 const ContractorPortal = lazy(() => import('./pages/ContractorPortal'));
 const Settings = lazy(() => import('./pages/Settings'));
 
-const MobileBottomNav: React.FC<{ currentTab: string; setCurrentTab: (t: string) => void; toggleSidebar: () => void }> = ({ currentTab, setCurrentTab, toggleSidebar }) => {
+interface MobileBottomNavProps {
+  currentTab: string;
+  setCurrentTab: (tab: string) => void;
+  toggleSidebar: () => void;
+  mobileDrawerOpen?: boolean;
+}
+
+const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ 
+  currentTab, 
+  setCurrentTab, 
+  toggleSidebar,
+  mobileDrawerOpen = false
+}) => {
   const { isInstalled, installPWA } = usePWA();
+  
+  if (mobileDrawerOpen) return null;
 
   const navItems = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -217,6 +231,7 @@ const MainContent: React.FC = () => {
           currentTab={currentTab} 
           setCurrentTab={setCurrentTab} 
           toggleSidebar={() => setMobileDrawerOpen(prev => !prev)} 
+          mobileDrawerOpen={mobileDrawerOpen}
         />
       </div>
     </div>
