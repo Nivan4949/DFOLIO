@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import client from '../api/client';
+import { usePWA } from '../context/PWAContext';
 import { 
   Bell,
   Search, 
@@ -10,7 +11,9 @@ import {
   CheckSquare,
   AlertTriangle,
   ExternalLink,
-  Loader2
+  Loader2,
+  Download,
+  Menu
 } from 'lucide-react';
 
 interface TopbarProps {
@@ -18,6 +21,7 @@ interface TopbarProps {
   theme: 'dark' | 'midnight';
   setTheme: (theme: 'dark' | 'midnight') => void;
   setCurrentTab?: (tab: string) => void;
+  toggleMobileDrawer?: () => void;
 }
 
 interface SearchResults {
@@ -29,54 +33,49 @@ interface SearchResults {
   photos: Array<{ id: string; url: string; caption?: string; uploadedBy?: { name: string } }>;
 }
 
-const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrentTab }) => {
+const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrentTab, toggleMobileDrawer }) => {
+  const { isInstalled, installPWA } = usePWA();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, text: 'New Daily Site Report submitted for Residence Project', time: '10m ago', read: false },
-    { id: 2, text: 'Snag #104 resolved by Site Engineer', time: '1h ago', read: false },
-    { id: 3, text: 'Architectural structural inspection scheduled', time: '4h ago', read: true },
+    { id: 2, text: 'Snag #04 (Electrical conduit) marked RESOLVED', time: '1h ago', read: false },
+    { id: 3, text: 'Concrete Pouring scheduled for Level 2 tomorrow', time: '3h ago', read: true }
   ]);
 
-  // Global Search State
   const [searchQuery, setSearchQuery] = useState('');
-  const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [searching, setSearching] = useState(false);
   const [showSearchPopover, setShowSearchPopover] = useState(false);
-
   const searchRef = useRef<HTMLDivElement>(null);
-  const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
-  };
-
+  // Close search popover on outside click
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setShowSearchPopover(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Debounced search API request
   useEffect(() => {
-    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+    if (!searchQuery.trim()) {
       setSearchResults(null);
       setShowSearchPopover(false);
       return;
     }
 
     const timer = setTimeout(async () => {
-      setSearching(true);
       try {
-        const res = await client.get('/api/search', {
-          params: { q: searchQuery.trim() },
-        });
-        setSearchResults(res.data.results);
+        setSearching(true);
+        // Assuming 'client' is defined or imported in your scope
+        const res = await client.get(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+        setSearchResults(res.data);
         setShowSearchPopover(true);
       } catch (err) {
-        console.error('Search error:', err);
+        console.error('Failed to execute search:', err);
       } finally {
         setSearching(false);
       }
@@ -85,31 +84,38 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const getPageTitle = () => {
+    switch (currentTab) {
+      case 'dashboard': return 'Executive Dashboard';
+      case 'projects': return 'Active Projects';
+      case 'rooms': return 'Rooms & Levels';
+      case 'categories': return 'Work Categories';
+      case 'subworks': return 'Sub Works & Trades';
+      case 'tasks': return 'Execution Works';
+      case 'timeline': return 'Critical Path Timeline';
+      case 'snags': return 'Defects & Snag List';
+      case 'reports': return 'Executive Site Reports';
+      case 'photos': return 'Site Inspection Gallery';
+      case 'users': return 'Team & Access Roles';
+      case 'client': return 'Client Inspection Portal';
+      case 'contractor': return 'Contractor Portal';
+      case 'settings': return 'System Settings';
+      default: return 'Architectural Control';
+    }
+  };
+
   const handleNavigateToTab = (tab: string) => {
     if (setCurrentTab) {
       setCurrentTab(tab);
     }
     setShowSearchPopover(false);
     setSearchQuery('');
-  };
-
-  const getPageTitle = () => {
-    switch (currentTab) {
-      case 'dashboard': return 'Overview';
-      case 'projects': return 'Projects';
-      case 'rooms': return 'Rooms';
-      case 'categories': return 'Categories';
-      case 'subworks': return 'Sub Works';
-      case 'tasks': return 'Works';
-      case 'timeline': return 'Timeline';
-      case 'snags': return 'Snags';
-      case 'reports': return 'Reports';
-      case 'photos': return 'Photos';
-      case 'users': return 'Team';
-      case 'contractor': return 'Contractors';
-      case 'settings': return 'Settings';
-      default: return 'Project Control';
-    }
   };
 
   const totalMatchCount = searchResults
@@ -122,19 +128,42 @@ const Topbar: React.FC<TopbarProps> = ({ currentTab, theme, setTheme, setCurrent
     : 0;
 
   return (
-    <header className="bg-white/80 dark:bg-[#18191D]/80 backdrop-blur-md sticky top-0 z-30 border-b border-[#E8E5DF] dark:border-[#2B2D34] py-4 px-6 md:px-8 flex justify-between items-center h-20 transition-colors">
+    <header className="bg-white/80 dark:bg-[#18191D]/80 backdrop-blur-md sticky top-0 z-30 border-b border-[#E8E5DF] dark:border-[#2B2D34] py-4 px-4 sm:px-6 md:px-8 flex justify-between items-center h-20 transition-colors">
       {/* Left Breadcrumb & Section Title */}
-      <div>
-        <div className="text-[9px] font-medium text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-[0.2em]">
-          Control Panel &nbsp;/&nbsp; {getPageTitle()}
+      <div className="flex items-center gap-3">
+        {toggleMobileDrawer && (
+          <button
+            onClick={toggleMobileDrawer}
+            className="md:hidden p-2 text-[#16171A] dark:text-[#F4F2ED] hover:bg-[#FAF8F5] dark:hover:bg-[#23252C] rounded-sm transition-colors"
+            title="Open Mobile Navigation"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        <div>
+          <div className="text-[9px] font-medium text-[#6E7179] dark:text-[#A0A4AD] uppercase tracking-[0.2em]">
+            Control Panel &nbsp;/&nbsp; {getPageTitle()}
+          </div>
+          <h1 className="font-serif text-lg sm:text-xl font-bold text-[#16171A] dark:text-[#F4F2ED] tracking-tight mt-0.5 truncate max-w-[200px] sm:max-w-none">
+            {getPageTitle()}
+          </h1>
         </div>
-        <h1 className="font-serif text-xl font-bold text-[#16171A] dark:text-[#F4F2ED] tracking-tight mt-0.5">
-          {getPageTitle()}
-        </h1>
       </div>
 
       {/* Center / Right Control Actions */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
+        
+        {/* PWA Install Button */}
+        {!isInstalled && (
+          <button
+            onClick={installPWA}
+            className="arch-btn-primary px-2.5 py-1.5 text-xs flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-500 dark:hover:bg-amber-600 border-none transition-all shadow-sm"
+            title="Download DFOLIO Web App"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline font-bold text-[10px] uppercase tracking-wider">Install App</span>
+          </button>
+        )}
         
         {/* Minimal Search Bar */}
         <div ref={searchRef} className="relative hidden md:block">

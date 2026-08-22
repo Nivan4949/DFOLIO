@@ -1,8 +1,12 @@
-const CACHE_NAME = 'dfolio-v1';
+const CACHE_NAME = 'dfolio-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon.svg',
+  '/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {

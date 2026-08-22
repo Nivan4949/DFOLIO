@@ -87,7 +87,9 @@ const BeforeAfterSlider: React.FC<{ beforeUrl: string; afterUrl: string }> = ({ 
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    handleMove(e.touches[0].clientX, rect);
+    if (e.touches && e.touches[0]) {
+      handleMove(e.touches[0].clientX, rect);
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -96,13 +98,20 @@ const BeforeAfterSlider: React.FC<{ beforeUrl: string; afterUrl: string }> = ({ 
     handleMove(e.clientX, rect);
   };
 
+  const handlePointerDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleMove(e.clientX, rect);
+  };
+
   return (
     <div 
-      className="before-after-slider h-80 cursor-ew-resize relative"
-      onMouseDown={() => setIsDragging(true)}
+      className="before-after-slider h-72 sm:h-96 cursor-ew-resize relative touch-none select-none"
+      onMouseDown={handlePointerDown}
       onMouseUp={() => setIsDragging(false)}
       onMouseLeave={() => setIsDragging(false)}
       onMouseMove={handleMouseMove}
+      onTouchStart={handleTouchMove}
       onTouchMove={handleTouchMove}
     >
       {/* After Image (Background) */}

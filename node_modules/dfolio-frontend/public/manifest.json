@@ -1,16 +1,31 @@
 {
   "short_name": "DFOLIO",
-  "name": "DFOLIO — Construction Execution System",
+  "name": "DFOLIO — Architectural Project Control System",
+  "description": "Premium architectural construction execution, site quality assurance, and project management control system.",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "id": "/",
   "display": "standalone",
-  "theme_color": "#060814",
-  "background_color": "#060814",
-  "orientation": "portrait"
+  "background_color": "#121316",
+  "theme_color": "#FAF8F5",
+  "orientation": "any",
+  "categories": ["business", "productivity", "utilities"]
 }
